@@ -1,3 +1,7 @@
 newsapi-python==0.2.7
 python-dotenv==1.0.0
 
+# Database packages
+psycopg2-binary==2.9.10
+sqlalchemy==2.0.36
+

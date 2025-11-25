@@ -14,10 +14,11 @@ Keep this simple and focused on business value demo.
 import streamlit as st
 import requests
 import pandas as pd
+import os
 from datetime import datetime
 
 # Configuration
-API_BASE_URL = "http://localhost:8000/api"  # Backend API
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api")  # Backend API
 
 # Page config
 st.set_page_config(

@@ -46,28 +46,30 @@ services:
     command: >
       sh -c "
         echo 'Initializing database tables...' &&
-        python scripts/init_db.py &&
+        python -m scripts.init_db &&
         echo 'Starting API backend...' &&
-        python src/main.py
+        python -m src.main
       "
 
   # Streamlit Dashboard (Internal UI)
-  streamlit:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: player-risk-streamlit
-    restart: unless-stopped
-    depends_on:
-      - backend
-    environment:
-      API_BASE_URL: http://backend:8000/api  # Connect to backend via Docker network
-    ports:
-      - "8501:8501"  # Streamlit default port
-    volumes:
-      - .:/app
-    working_dir: /app
-    command: streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
+  # Uncomment if you want Streamlit in Docker (good for demos/production)
+  # For development, run locally: streamlit run streamlit_app/app.py
+  # streamlit:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: player-risk-streamlit
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     API_BASE_URL: http://backend:8000/api  # Connect to backend via Docker network
+  #   ports:
+  #     - "8501:8501"  # Streamlit default port
+  #   volumes:
+  #     - .:/app
+  #   working_dir: /app
+  #   command: streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   # Named volume for PostgreSQL data persistence

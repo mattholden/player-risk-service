@@ -4,10 +4,15 @@ FROM python:3.13-slim
 # Set working directory inside container
 WORKDIR /app
 
-# Install system dependencies if needed
-# RUN apt-get update && apt-get install -y \
-#     gcc \
-#     && rm -rf /var/lib/apt/lists/*
+# Install system dependencies needed for Python packages
+# gcc: Required for compiling numpy (needed by streamlit)
+# g++: Required for some C++ dependencies
+# python3-dev: Python development headers
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
 COPY requirements.txt .

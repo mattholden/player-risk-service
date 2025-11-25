@@ -9,7 +9,7 @@ This package contains all database-related code:
 
 # Import and expose key components
 from database.base import Base
-from database.models import Article
+from database.models import Article, Player, RiskTag
 from database.database import (
     DatabaseManager,
     db_manager,
@@ -20,6 +20,8 @@ from database.database import (
 __all__ = [
     'Base',
     'Article',
+    'Player',
+    'RiskTag',
     'DatabaseManager',
     'db_manager',
     'get_session',

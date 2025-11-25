@@ -10,7 +10,8 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
-from models import Base
+# Import Base and models to ensure they're registered
+from database.models import Base
 
 # Load environment variables
 load_dotenv()

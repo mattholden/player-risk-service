@@ -1,14 +1,10 @@
 """
-Database models for the player risk service.
-
-This module defines SQLAlchemy ORM models that map to database tables.
+Article database model.
 """
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Index
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
+from database.base import Base
 
 
 class Article(Base):

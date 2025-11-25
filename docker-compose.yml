@@ -21,6 +21,53 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: player-risk-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy  # Wait for postgres to be ready
+    environment:
+      # Use container name 'postgres' as host (internal Docker network)
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      NEWSAPI_KEY: ${NEWSAPI_KEY}
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}  # Uncomment when you add LLM
+    ports:
+      - "8000:8000"  # API endpoints
+    volumes:
+      - .:/app  # Mount code for development hot-reload
+    working_dir: /app
+    command: >
+      sh -c "
+        echo 'Initializing database tables...' &&
+        python scripts/init_db.py &&
+        echo 'Starting API backend...' &&
+        python src/main.py
+      "
+
+  # Streamlit Dashboard (Internal UI)
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: player-risk-streamlit
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      API_BASE_URL: http://backend:8000/api  # Connect to backend via Docker network
+    ports:
+      - "8501:8501"  # Streamlit default port
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   # Named volume for PostgreSQL data persistence

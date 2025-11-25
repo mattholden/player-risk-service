@@ -1,11 +1,13 @@
 """
 Database initialization script.
 
-This script creates all database tables defined in models.py.
-Run this script to set up your database schema.
+This script creates all database tables defined in database/models/.
+Run this script from the PROJECT ROOT:
+    python scripts/init_db.py
 
 Usage:
-    python init_db.py
+    python scripts/init_db.py           # Initialize database
+    python scripts/init_db.py --reset   # Reset database (deletes all data!)
 """
 
 import sys

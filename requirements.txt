@@ -5,10 +5,14 @@ python-dotenv==1.0.0
 psycopg2-binary==2.9.10
 sqlalchemy==2.0.36
 
+# LLM Integration
+openai==1.12.0  # Stable version compatible with httpx and xAI API
+pydantic==2.10.0  # Data validation and settings
+tenacity==8.5.0  # Retry logic with exponential backoff (compatible with Streamlit)
+
 # API Framework (future)
 # fastapi==0.104.1
 # uvicorn==0.24.0
-# pydantic==2.5.0
 
 # Streamlit Dashboard
 streamlit==1.29.0

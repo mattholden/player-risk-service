@@ -1,4 +1,4 @@
-.PHONY: help test test-article test-player init-db docker-up docker-down streamlit clean db-shell db-tables db-articles db-players
+.PHONY: help test test-article test-player test-grok test-research init-db docker-up docker-down streamlit clean db-shell db-tables db-articles db-players
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -18,6 +18,8 @@ help:
 	@echo "  make test           - Run all tests"
 	@echo "  make test-article   - Test Article model"
 	@echo "  make test-player    - Test Player model"
+	@echo "  make test-grok      - Test Grok API client"
+	@echo "  make test-research  - Test Research Agent"
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -40,6 +42,12 @@ test-article:
 
 test-player:
 	python -m scripts.test_player
+
+test-grok:
+	python -m scripts.test_grok_client
+
+test-research-agent:
+	python -m scripts.test_research_agent
 
 streamlit:
 	streamlit run streamlit_app/app.py

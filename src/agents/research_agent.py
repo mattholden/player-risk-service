@@ -12,7 +12,7 @@ This is Agent #1 in the two-agent pipeline.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 import json
 
 from src.clients.grok_client import GrokClient
@@ -66,12 +66,13 @@ class ResearchAgent:
         print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
         
         # Build the search prompt
-        prompt = self._build_prompt(context, lookback_days)
-        
+        user_message = self._build_user_message(context, lookback_days)
+        system_message = self._build_system_message()
+        messages = [system_message, user_message]
         # Execute search via Grok
         try:
-            response = self.grok_client.search_and_summarize(
-                query=prompt,
+            response = self.grok_client.chat_completion(
+                messages=messages,
             )
             
             # DEBUG: Print raw response to see what Grok returned
@@ -98,9 +99,9 @@ class ResearchAgent:
                 confidence_score=0.0
             )
     
-    def _build_prompt(self, context: PlayerContext, lookback_days: int) -> str:
+    def _build_user_message(self, context: PlayerContext, lookback_days: int) -> str:
         """
-        Build an intelligent search prompt for Grok.
+        Build a user message for the Grok API.
         
         Args:
             context: Player context
@@ -129,7 +130,25 @@ Search the web for:
 Include all sources and URLs where you found information.
 """
         
-        return prompt
+        return {
+            "role": "user",
+            "content": prompt
+        }
+    
+    def _build_system_message(self) -> Dict[str, Any]:
+        """
+        Build system message for the Grok API.
+        """
+        prompt = """
+You have access to real-time web search. Always perform a fresh web search
+to find the most recent information. Search X (Twitter), news sites, sports
+websites, and any other relevant sources. Prioritise information found within the last 48 hours."
+Include URLs for all sources you find. 
+"""
+        return {
+            "role": "system",
+            "content": prompt
+        }
     
     def _parse_response(
         self, 

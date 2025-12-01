@@ -82,23 +82,33 @@ def test_sports_query(client: GrokClient):
     
     try:
         print("🔍 Searching for recent NBA news...")
+
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a sports reporter. Search for the latest NBA game results."
+            },
+            {
+                "role": "user",
+                "content": "What happened in the most recent NBA games today? Provide 2-3 examples with scores."
+            }
+        ]
         
-        response = client.search_and_summarize(
-            query="What happened in the most recent NBA games today? Provide 2-3 examples with scores.",
+        response = client.chat_completion(
+            messages=messages,
         )
         
-        print(f"\n✅ Response received:")
-        print(f"   {response['content'][:500]}...")  # First 500 chars
-        print(f"\n📊 Stats:")
+        print("✅ Response received:")
+        print(f"   Content: {response['content']}")
         print(f"   Model: {response['model']}")
         print(f"   Tokens: {response['usage']['total_tokens']}")
-        
+        print(f"   Timestamp: {response['created_at']}")
+
         return True
         
     except Exception as e:
         print(f"❌ Sports query failed: {e}")
         return False
-
 
 def test_rate_limiting(client: GrokClient):
     """Test rate limit tracking."""

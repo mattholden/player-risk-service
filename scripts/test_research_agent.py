@@ -30,7 +30,7 @@ def print_header(title: str):
     print("=" * 70)
 
 
-def test_jack_currie():
+def test_research_agent(context: PlayerContext):
     """Test research for Matt Phillips - Oxford United."""
     print_header("🔬 Research Agent Test - Matt Phillips")
     
@@ -39,16 +39,7 @@ def test_jack_currie():
     grok_client = GrokClient()
     agent = ResearchAgent(grok_client)
     
-    # Create player context
-    context = PlayerContext(
-        name="Matt Phillips",
-        fixture="Oxford United vs Ipswich Town",
-        fixture_date=datetime(2025, 11, 28, 19, 45),
-        team="Oxford United",
-        position="Midfielder"
-    )
-    
-    print(f"\n🎯 Target Player:")
+    print("\n🎯 Target Player:")
     print(f"   Name: {context.name}")
     print(f"   Team: {context.team}")
     print(f"   Position: {context.position}")
@@ -62,12 +53,12 @@ def test_jack_currie():
     # Display results
     print_header("📊 Research Findings")
     
-    print(f"\n✅ Research completed successfully!")
+    print("\n✅ Research completed successfully!")
     print(f"   Timestamp: {findings.search_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"   Confidence Score: {findings.confidence_score:.2f}")
     
     # Summary
-    print(f"\n📝 Summary:")
+    print("\n📝 Summary:")
     print(f"   {findings.summary}")
     
     # Key Findings
@@ -76,7 +67,7 @@ def test_jack_currie():
         for i, finding in enumerate(findings.key_findings, 1):
             print(f"   {i}. {finding}")
     else:
-        print(f"\n⚠️  No key findings extracted")
+        print("\n⚠️  No key findings extracted")
     
     # Sources
     if findings.sources:
@@ -85,7 +76,7 @@ def test_jack_currie():
             print(f"\n   [{i}] {source.title}")
             print(f"       URL: {source.url}")
     else:
-        print(f"\n⚠️  No sources found")
+        print("\n⚠️  No sources found")
     
     # Rate limit status
     print_header("📊 API Usage")
@@ -94,53 +85,6 @@ def test_jack_currie():
     print(f"   Remaining: {status['requests_remaining']}/{status['limit']}")
     
     return findings
-
-
-def test_with_multiple_players():
-    """Test with multiple players to see variety of responses."""
-    print_header("🔬 Multi-Player Research Test")
-    
-    grok_client = GrokClient()
-    agent = ResearchAgent(grok_client)
-    
-    players = [
-        PlayerContext(
-            name="Jack Currie",
-            fixture="Oxford United vs Ipswich Town",
-            fixture_date=datetime(2025, 11, 28, 19, 45),
-            team="Oxford United",
-            position="Defender"
-        ),
-        PlayerContext(
-            name="Liam Sercombe",
-            fixture="Oxford United vs Ipswich Town",
-            fixture_date=datetime(2025, 11, 28, 19, 45),
-            team="Oxford United",
-            position="Midfielder"
-        )
-    ]
-    
-    results = []
-    for context in players:
-        print(f"\n\n{'='*70}")
-        print(f"Researching: {context.name}")
-        print('='*70)
-        
-        findings = agent.research_player(context, lookback_days=7)
-        results.append((context, findings))
-        
-        print(f"\n✅ {context.name}: {len(findings.sources)} sources, confidence {findings.confidence_score:.2f}")
-        print(f"   Summary: {findings.summary[:100]}...")
-    
-    # Summary comparison
-    print_header("📊 Multi-Player Summary")
-    for context, findings in results:
-        print(f"\n   {context.name}:")
-        print(f"      Sources: {len(findings.sources)}")
-        print(f"      Key Findings: {len(findings.key_findings)}")
-        print(f"      Confidence: {findings.confidence_score:.2f}")
-    
-    return results
 
 
 def main():
@@ -153,24 +97,15 @@ def main():
     print("="*70)
     
     try:
-        # Test 1: Single player (Jack Currie)
-        findings = test_jack_currie()
-        
-        # Test 2: Multiple players (optional - commented out to save API calls)
-        # Uncomment if you want to test multiple players at once
-        # print("\n\n")
-        # results = test_with_multiple_players()
-        
-        # Final summary
-        print_header("✅ Testing Complete")
-        print("\n📝 Next Steps:")
-        print("   1. Review the research findings above")
-        print("   2. Check if sources are relevant and credible")
-        print("   3. Verify confidence scores make sense")
-        print("   4. Ready to build Assessment Agent (Agent #2)")
-        print("\n   Future: python -m scripts.test_assessment_agent")
-        print()
-        
+
+        context = PlayerContext(
+            name="Matt Phillips",
+            fixture="Oxford United vs Swansea City",
+            fixture_date=datetime(2025, 12, 6, 19, 45),
+            team="Oxford United",
+            position="Midfielder"
+        )
+        test_research_agent(context)
         return True
         
     except Exception as e:

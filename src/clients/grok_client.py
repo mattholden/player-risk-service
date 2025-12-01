@@ -49,7 +49,7 @@ class GrokClient:
         api_key: Optional[str] = None,
         model: str = "grok-2-1212",
         max_tokens: int = 2000,
-        temperature: float = 0.3
+        temperature: float = 0.2
     ):
         """
         Initialize Grok API client.
@@ -184,7 +184,7 @@ class GrokClient:
         print("Choice:")
         print(type(choice))
         print(choice)
-        
+
         return {
             "content": choice.message.content,
             "role": choice.message.role,
@@ -198,36 +198,6 @@ class GrokClient:
             "created_at": datetime.fromtimestamp(response.created)
         }
     
-    def search_and_summarize(
-        self,
-        query: str,
-        max_sources: int = 10
-    ) -> Dict[str, Any]:
-        """
-        Use Grok's web search capability to find information and summarize.
-        
-        This leverages Grok's ability to search X (Twitter) and the web in real-time.
-        
-        Args:
-            query: Search query (e.g., "Jack Currie injury news Oxford United")
-            context: Additional context to guide the search
-            max_sources: Maximum number of sources to return
-            
-        Returns:
-            API response with search results and summary
-        """
-
-        system_message = self._get_system_message()
-        
-        user_message = {
-            "role": "user",
-            "content": query
-        }
-        
-        return self.chat_completion(
-            messages=[system_message, user_message],
-            temperature=0.2  # Lower temperature for more factual search
-        )
     
     def get_rate_limit_status(self) -> Dict[str, Any]:
         """
@@ -254,18 +224,6 @@ class GrokClient:
             "reset_time": (
                 self._request_timestamps[0] + timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
                 if self._request_timestamps else now
-            )
-        }
-    def _get_system_message(self) -> Dict[str, Any]:
-        """
-        Get the system message for the Grok API.
-        """
-        return {
-            "role": "system",
-            "content": (
-                "You have access to real-time web search. Always perform a fresh web search "
-                "to find the most recent information. Search X (Twitter), news sites, sports "
-                "websites, and any other relevant sources. Include URLs for all sources you find. "
             )
         }
 

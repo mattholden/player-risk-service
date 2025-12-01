@@ -7,7 +7,7 @@ between different parts of the agent pipeline.
 
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class PlayerContext(BaseModel):
@@ -33,6 +33,22 @@ class PlayerContext(BaseModel):
             }
         }
 
+class TeamContext(BaseModel):
+    """
+    Input context for researching a team's injury status.
+    """
+    team: str = Field(..., description="Team name")
+    fixture: str = Field(..., description="Match fixture (e.g., 'Arsenal vs Brentford')")
+    fixture_date: datetime = Field(..., description="Date and time of the fixture")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "team": "Arsenal",
+                "fixture": "Arsenal vs Brentford",
+                "fixture_date": "2025-11-28T19:45:00"
+            }
+        }
 
 class Source(BaseModel):
     """
@@ -51,7 +67,48 @@ class Source(BaseModel):
             }
         }
 
+class InjuryResearchFindings(BaseModel):
 
+    team_name: str = Field(..., description = "Team being researched")
+    fixture: str = Field(..., description = "Match fixture (e.g., 'Arsenal vs Brentford')")
+    findings: List[str] = Field(
+        default_factory=list, 
+        description = "List of findings"
+        )
+    sources: List[Source] = Field(
+        default_factory=list, 
+        description = "List of sources"
+        )
+    confidence_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence in findings (0.0 = no info, 1.0 = very confident)"
+        )
+    search_timestamp: datetime = Field(
+        default_factory=datetime.now,
+        description="When this research was conducted"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "team_name": "Arsenal",
+                "fixture": "Arsenal vs Brentford",
+                "findings": [
+                    "Player X is injured and will be out for the next 2 weeks",
+                    "Player Y is doubtful for the next match",
+                    "Player Z is available for the next match"
+                ],
+                "sources": [
+                    {
+                        "url": "https://twitter.com/Arsenal/status/123456",
+                        "title": "Arsenal Official",
+                    }
+                ],
+                "confidence_score": 0.85,
+            }
+        }
 class ResearchFindings(BaseModel):
     """
     Output from the Research Agent.

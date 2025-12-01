@@ -20,7 +20,7 @@ load_dotenv()
 
 from src.clients.grok_client import GrokClient
 from src.agents.research_agent import ResearchAgent
-from src.agents.models import PlayerContext
+from src.agents.models import TeamContext
 
 
 def print_header(title: str):
@@ -30,9 +30,9 @@ def print_header(title: str):
     print("=" * 70)
 
 
-def test_research_agent(context: PlayerContext):
+def test_research_agent(context: TeamContext):
     """Test research for Matt Phillips - Oxford United."""
-    print_header("🔬 Research Agent Test - Matt Phillips")
+    print_header(f"🔬 Research Agent Test - {context.team}")
     
     # Initialize components
     print("\n📦 Initializing...")
@@ -40,43 +40,17 @@ def test_research_agent(context: PlayerContext):
     agent = ResearchAgent(grok_client)
     
     print("\n🎯 Target Player:")
-    print(f"   Name: {context.name}")
     print(f"   Team: {context.team}")
-    print(f"   Position: {context.position}")
     print(f"   Fixture: {context.fixture}")
     print(f"   Match Date: {context.fixture_date.strftime('%A, %B %d, %Y at %H:%M')}")
     
     # Execute research
     print_header("🔍 Executing Research")
-    findings = agent.research_player(context, lookback_days=7)
-    
-    # Display results
-    print_header("📊 Research Findings")
+    findings = agent.research_team(context, lookback_days=7)
     
     print("\n✅ Research completed successfully!")
     print(f"   Timestamp: {findings.search_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"   Confidence Score: {findings.confidence_score:.2f}")
-    
-    # Summary
-    print("\n📝 Summary:")
-    print(f"   {findings.summary}")
-    
-    # Key Findings
-    if findings.key_findings:
-        print(f"\n🔑 Key Findings ({len(findings.key_findings)}):")
-        for i, finding in enumerate(findings.key_findings, 1):
-            print(f"   {i}. {finding}")
-    else:
-        print("\n⚠️  No key findings extracted")
-    
-    # Sources
-    if findings.sources:
-        print(f"\n📚 Sources ({len(findings.sources)}):")
-        for i, source in enumerate(findings.sources, 1):
-            print(f"\n   [{i}] {source.title}")
-            print(f"       URL: {source.url}")
-    else:
-        print("\n⚠️  No sources found")
     
     # Rate limit status
     print_header("📊 API Usage")
@@ -89,7 +63,6 @@ def test_research_agent(context: PlayerContext):
 
 def main():
     """Run the test suite."""
-    import sys
     
     print("\n" + "="*70)
     print("🚀 Research Agent Testing Suite")
@@ -98,12 +71,10 @@ def main():
     
     try:
 
-        context = PlayerContext(
-            name="Matt Phillips",
-            fixture="Oxford United vs Swansea City",
-            fixture_date=datetime(2025, 12, 6, 19, 45),
-            team="Oxford United",
-            position="Midfielder"
+        context = TeamContext(
+            team="Arsenal",
+            fixture="Arsenal vs Brentford",
+            fixture_date=datetime(2025, 12, 3, 19, 45),
         )
         test_research_agent(context)
         return True

@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 import json
 
 from src.clients.grok_client import GrokClient
-from src.agents.models import PlayerContext, ResearchFindings, Source
+from src.agents.models import Source, InjuryResearchFindings, TeamContext
 
 
 class ResearchAgent:
@@ -46,11 +46,11 @@ class ResearchAgent:
         self.grok_client = grok_client
         print("✅ ResearchAgent initialized")
     
-    def research_player(
+    def research_team(
         self, 
-        context: PlayerContext,
-        lookback_days: int = 7
-    ) -> ResearchFindings:
+        context: TeamContext,
+        lookback_days: int = 14
+    ) -> InjuryResearchFindings:
         """
         Research a player's injury status and availability.
         
@@ -59,15 +59,19 @@ class ResearchAgent:
             lookback_days: How many days back to search for news
             
         Returns:
-            ResearchFindings with sources, key findings, and summary
+            InjuryResearchFindings with sources, key findings, and summary
         """
-        print(f"\n🔍 Researching: {context.name}")
+        print(f"\n🔍 Researching: {context.team}")
         print(f"   Fixture: {context.fixture}")
         print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
         
         # Build the search prompt
         user_message = self._build_user_message(context, lookback_days)
         system_message = self._build_system_message()
+        print("System message:")
+        print(system_message)
+        print("User message:")
+        print(user_message)
         messages = [system_message, user_message]
         # Execute search via Grok
         try:
@@ -85,21 +89,21 @@ class ResearchAgent:
             # Parse the response into structured findings
             findings = self._parse_response(response, context)
             
-            print(f"✅ Research complete: {len(findings.sources)} sources found")
             return findings
             
         except Exception as e:
             print(f"❌ Research failed: {e}")
             # Return empty findings on error
-            return ResearchFindings(
-                player_name=context.name,
+            return InjuryResearchFindings(
+                team_name=context.team,
+                fixture=context.fixture,
+                findings=[],
                 sources=[],
-                key_findings=[],
-                summary=f"Unable to retrieve information: {str(e)}",
-                confidence_score=0.0
+                confidence_score=0.0,
+                search_timestamp=datetime.now()
             )
     
-    def _build_user_message(self, context: PlayerContext, lookback_days: int) -> str:
+    def _build_user_message(self, context: TeamContext, lookback_days: int) -> str:
         """
         Build a user message for the Grok API.
         
@@ -114,20 +118,21 @@ class ResearchAgent:
         fixture_date_str = context.fixture_date.strftime("%B %d, %Y")
         search_from = (datetime.now() - timedelta(days=lookback_days)).strftime("%B %d, %Y")
         
-        # Build team context if available
-        team_context = f" who plays for {context.team}" if context.team else ""
-        
         # Simple, natural prompt - explicitly request web search
-        prompt = f"""Perform a fresh web search to find any injury news about {context.name}{team_context} for the upcoming match {context.fixture} on {fixture_date_str}.
+        prompt = f"""
+Search for injury news about {context.team} ahead of their match against {context.fixture} on {fixture_date_str}.
 
-Search the web for:
-- Injury updates or concerns
-- Training/practice status  
-- Coach or team comments about availability
-- Any fitness issues
-- Recent match reports
+Focus on:
+- Squad availability and fitness updates
+- Players ruled out or doubtful
+- Players returning from injury
+- Players who have had persistent injuries
+- Training ground reports from the last {lookback_days} days
 
-Include all sources and URLs where you found information.
+Search timeframe: Last {lookback_days} days (from {search_from} to today)
+Today's date: {datetime.now().strftime("%B %d, %Y")}
+
+Return your findings in the JSON format specified in the system instructions.
 """
         
         return {
@@ -135,15 +140,36 @@ Include all sources and URLs where you found information.
             "content": prompt
         }
     
-    def _build_system_message(self) -> Dict[str, Any]:
+    def _build_system_message(self) -> Dict[str, Any]: 
         """
         Build system message for the Grok API.
         """
+
         prompt = """
-You have access to real-time web search. Always perform a fresh web search
-to find the most recent information. Search X (Twitter), news sites, sports
-websites, and any other relevant sources. Prioritise information found within the last 48 hours."
-Include URLs for all sources you find. 
+You are a sports injury research assistant for the 2025/2026 football season.
+
+Your task: Search the web in real-time for injury news about specific players before upcoming fixtures.
+
+What to search for:
+- Injury updates and recovery status
+- Training/practice participation
+- Manager or medical staff comments
+- Match availability and fitness concerns
+- Recent performance if returning from injury
+
+Search sources: Team websites, news outlets, X (Twitter), sports forums, official announcements.
+
+Requirements:
+- Prioritize information from the last 48 hours
+- Include source URLs for all information
+- Be objective - report only confirmed information, note speculation clearly
+- If no recent news exists, state that explicitly
+
+Return findings as structured JSON:
+{
+  "summaries": ["Concise finding 1", "Concise finding 2"],
+  "sources": [{"number": 1, "title": "Article title", "url": "https://...", "date": "YYYY-MM-DD"}]
+}
 """
         return {
             "role": "system",
@@ -153,8 +179,8 @@ Include URLs for all sources you find.
     def _parse_response(
         self, 
         response: dict, 
-        context: PlayerContext
-    ) -> ResearchFindings:
+        context: TeamContext
+    ) -> InjuryResearchFindings:
         """
         Parse Grok's response into structured ResearchFindings.
         
@@ -166,10 +192,6 @@ Include URLs for all sources you find.
             Structured ResearchFindings object
         """
         content = response.get('content', '')
-
-        print("Content:")
-        print(type(content))
-        print(content)
         
         # Try to extract JSON from the response
         try:
@@ -178,17 +200,21 @@ Include URLs for all sources you find.
                 json_start = content.find('```json') + 7
                 json_end = content.find('```', json_start)
                 json_str = content[json_start:json_end].strip()
+                print("First Condition")
             elif '```' in content:
                 json_start = content.find('```') + 3
                 json_end = content.find('```', json_start)
                 json_str = content[json_start:json_end].strip()
+                print("Second Condition")
             elif '{' in content and '}' in content:
                 # Try to extract raw JSON
                 json_start = content.find('{')
                 json_end = content.rfind('}') + 1
                 json_str = content[json_start:json_end]
+                print("Third Condition")
             else:
                 # No JSON found, create findings from raw text
+                print("Fourth Condition")
                 return self._create_findings_from_text(content, context)
             
             # Parse the JSON
@@ -207,12 +233,13 @@ Include URLs for all sources you find.
                     continue
             
             # Create findings
-            return ResearchFindings(
-                player_name=context.name,
-                sources=sources,
-                key_findings=data.get('key_findings', []),
-                summary=data.get('summary', content[:200]),
-                confidence_score=data.get('confidence_score', 0.5)
+            return InjuryResearchFindings(
+                team_name=context.team,
+                fixture=context.fixture,
+                findings=data.get('summaries', []),
+                sources=data.get('sources', []),
+                confidence_score=data.get('confidence_score', 0.0),
+                search_timestamp=datetime.now()
             )
             
         except Exception as e:
@@ -223,8 +250,8 @@ Include URLs for all sources you find.
     def _create_findings_from_text(
         self, 
         content: str, 
-        context: PlayerContext
-    ) -> ResearchFindings:
+        context: TeamContext
+    ) -> InjuryResearchFindings:
         """
         Create findings from unstructured text when JSON parsing fails.
         
@@ -233,9 +260,8 @@ Include URLs for all sources you find.
             context: Player context
             
         Returns:
-            Basic ResearchFindings extracted from text
+            Basic InjuryResearchFindings extracted from text
         """
-        print("JSON PARSING FAILED")
         # Try to extract URLs from text
         import re
         urls = re.findall(r'https?://[^\s\)]+', content)
@@ -258,12 +284,13 @@ Include URLs for all sources you find.
             if context.name.split()[0] in sentence:  # Check for player's first name
                 key_findings.append(sentence.strip() + '.')
         
-        return ResearchFindings(
-            player_name=context.name,
+        return InjuryResearchFindings(
+            team_name=context.team,
+            fixture=context.fixture,
+            findings=key_findings if key_findings else ["Research completed but no structured findings available"],
             sources=sources,
-            key_findings=key_findings if key_findings else ["Research completed but no structured findings available"],
-            summary=summary,
-            confidence_score=0.3  # Low confidence for unstructured data
+            confidence_score=0.3,  # Low confidence for unstructured data
+            search_timestamp=datetime.now()
         )
     
     def _parse_datetime(self, dt_string: Optional[str]) -> Optional[datetime]:
@@ -301,30 +328,27 @@ def test_agent():
     agent = ResearchAgent(grok_client)
     
     # Test with a well-known player
-    context = PlayerContext(
-        name="Jack Currie",
-        fixture="Oxford United vs Ipswich Town",
-        fixture_date=datetime(2025, 11, 28, 19, 45),
+    context = TeamContext(
         team="Oxford United",
-        position="Defender"
+        fixture="Oxford United vs Ipswich Town",
+        fixture_date=datetime(2025, 11, 28, 19, 45)
     )
     
-    findings = agent.research_player(context)
+    findings = agent.research_team(context)
     
     print("\n" + "="*60)
     print("📊 Research Results")
     print("="*60)
-    print(f"Player: {findings.player_name}")
+    print(f"Team: {findings.team_name}")
     print(f"Sources found: {len(findings.sources)}")
     print(f"Confidence: {findings.confidence_score}")
-    print(f"\nSummary:\n{findings.summary}")
     print(f"\nKey Findings:")
-    for i, finding in enumerate(findings.key_findings, 1):
+    for i, finding in enumerate(findings.findings, 1):
         print(f"{i}. {finding}")
     print(f"\nSources:")
     for i, source in enumerate(findings.sources, 1):
-        print(f"{i}. [{source.source_type}] {source.title}")
-        print(f"   {source.url}")
+        print(f"{i}. {source.title}")
+        print(f"       URL: {source.url}")
 
 
 if __name__ == "__main__":

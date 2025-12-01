@@ -47,9 +47,9 @@ class GrokClient:
     def __init__(
         self, 
         api_key: Optional[str] = None,
-        model: str = "grok-2-1212",
+        model: str = "grok-4-1-fast-reasoning",
         max_tokens: int = 2000,
-        temperature: float = 0.2
+        temperature: float = 0.8
     ):
         """
         Initialize Grok API client.
@@ -159,7 +159,6 @@ class GrokClient:
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                temperature=temperature,
                 **kwargs
             )
             
@@ -180,10 +179,6 @@ class GrokClient:
             Dictionary with parsed response data
         """
         choice = response.choices[0]
-
-        print("Choice:")
-        print(type(choice))
-        print(choice)
 
         return {
             "content": choice.message.content,

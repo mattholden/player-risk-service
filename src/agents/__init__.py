@@ -8,7 +8,7 @@ Contains:
 """
 
 from .research_agent import ResearchAgent
-from .models import Source, InjuryResearchFindings, TeamContext
+from .models import Source, InjuryResearchFindings, TeamContext, TeamAnalysis
 
-__all__ = ['ResearchAgent', 'Source', 'InjuryResearchFindings', 'TeamContext']
+__all__ = ['ResearchAgent', 'Source', 'InjuryResearchFindings', 'TeamContext', 'TeamAnalysis']
 

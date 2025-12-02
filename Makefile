@@ -49,6 +49,9 @@ test-grok:
 test-research-agent:
 	python -m scripts.test_research_agent
 
+test-analyst-agent:
+	python -m scripts.test_analyst_agent
+
 streamlit:
 	streamlit run streamlit_app/app.py
 

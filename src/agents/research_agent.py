@@ -2,7 +2,7 @@
 Research Agent - Searches for player injury news using Grok.
 
 This agent:
-1. Takes a PlayerContext (name, fixture, date, etc.)
+1. Takes a TeamContext (name, fixture, date, etc.)
 2. Builds an intelligent search prompt
 3. Uses Grok's real-time search (X/Twitter + web)
 4. Extracts structured findings with source citations
@@ -131,6 +131,8 @@ Focus on:
 
 Search timeframe: Last {lookback_days} days (from {search_from} to today)
 Today's date: {datetime.now().strftime("%B %d, %Y")}
+
+Make sure to include any existing injuries that are still ongoing as well as any new injury news.
 
 Return your findings in the JSON format specified in the system instructions.
 """

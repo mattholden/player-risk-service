@@ -38,8 +38,10 @@ class TeamContext(BaseModel):
     Input context for researching a team's injury status.
     """
     team: str = Field(..., description="Team name")
+    opponent: str = Field(..., description="Opponent team name")
     fixture: str = Field(..., description="Match fixture (e.g., 'Arsenal vs Brentford')")
     fixture_date: datetime = Field(..., description="Date and time of the fixture")
+
     
     class Config:
         json_schema_extra = {
@@ -167,4 +169,14 @@ class ResearchFindings(BaseModel):
     def to_dict(self) -> dict:
         """Convert to dictionary for database storage."""
         return self.model_dump(mode='json')
+
+class TeamAnalysis(BaseModel):
+    """
+    Output from the analysis agent
+    """
+    team_name_A: str = Field(..., description="First team being analyzed")
+    team_name_B: str = Field(..., description="Second team being analyzed")
+    fixture: str = Field(..., description="Fixture being analyzed")
+    
+
 

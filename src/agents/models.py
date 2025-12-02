@@ -8,6 +8,8 @@ between different parts of the agent pipeline.
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from enum import Enum as PyEnum
+from database.enums import RiskTag
 
 
 class PlayerContext(BaseModel):
@@ -174,9 +176,25 @@ class TeamAnalysis(BaseModel):
     """
     Output from the analysis agent
     """
-    team_name_A: str = Field(..., description="First team being analyzed")
-    team_name_B: str = Field(..., description="Second team being analyzed")
+    team_name: str = Field(..., description="Team being analyzed")
+    opponent_name: str = Field(..., description="Opponent team being analyzed")
     fixture: str = Field(..., description="Fixture being analyzed")
+    team_analysis: str = Field(..., description="Analysis of the team's performance")
     
+class PlayerRisk(BaseModel):
+    """
+    Output from the shark agent
+    """
+    player_name: str = Field(..., description="Player being analyzed")
+    risk: RiskTag = Field(..., description="Risk of the player playing in the fixture")
+    description: str = Field(..., description="Description of the risk")
 
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "player_name": "Jack Currie",
+                "risk": RiskTag.HIGH,
+                "description": "Jack Currie is injured and will be out for the next 2 weeks"
+            }
+        }

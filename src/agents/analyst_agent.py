@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import json
-
+import re
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, Source, TeamAnalysis
+
 
 class AnalystAgent:
     """
@@ -21,20 +22,20 @@ class AnalystAgent:
 
     def analyze_injury_news(
         self,
-        team_context: TeamContext, 
+        context: TeamContext, 
         injury_news: list
         ) -> TeamAnalysis:
         """
         Analyze injury news and determine the impact on a team's performance.
         """
-        print(f"\n🔍 Analyzing Fixture: {team_context.fixture}")
-        print(f"   Fixture: {team_context.fixture}")
-        print(f"   Date: {team_context.fixture_date.strftime('%B %d, %Y')}")
-        print(f"   Team: {team_context.team}")
-        print(f"   Opponent: {team_context.opponent}")
+        print(f"\n🔍 Analyzing Fixture: {context.fixture}")
+        print(f"   Fixture: {context.fixture}")
+        print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
+        print(f"   Team: {context.team}")
+        print(f"   Opponent: {context.opponent}")
 
         # Build the search prompt
-        user_message = self._build_user_message(injury_news, team_context)
+        user_message = self._build_user_message(injury_news, context)
         system_message = self._build_system_message()
         print("System message:")
         print(system_message)
@@ -55,14 +56,18 @@ class AnalystAgent:
             print(f"❌ Analysis failed: {e}")
             return None
         
-        return None
+        return TeamAnalysis(
+            team_name=context.team,
+            opponent_name=context.opponent,
+            fixture=context.fixture,
+            team_analysis=self.clean_response(response.get('content', ''))
+        )
     
-    def _parse_response(self, response: dict, team_context: TeamContext) -> TeamAnalysis:
-        """
-        Parse the response into structured findings
-        """
-
-        return "The impact of the injury news on the team's performance is..."
+    def clean_response(self, text: str) -> str:
+        # Remove markdown formatting
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove **bold**
+        text = re.sub(r'###\s+', '', text)  # Remove ### headers
+        return text
 
 
     def _build_user_message(self, injury_news: list, context: TeamContext) -> Dict[str, Any]:
@@ -107,7 +112,7 @@ Required research:
 3. Review recent match reports from the last month
 4. Check current season statistics and form
 
-Provide a comprehensive report covering:
+Provide a comprehensive 1-2 paragraphreport covering:
 1. Key absences and their impact
 2. Likely lineup/tactical adjustments for both teams (based on current rosters)
 3. Players to watch (beneficiaries of increased opportunity)
@@ -150,7 +155,7 @@ Research priorities when using web search:
 - Current season statistics only
 
 Output requirements:
-- Write a concise analytical report (2-3 paragraphs)
+- Write a concise analytical report (1-2 paragraphs)
 - Focus on tactical and strategic implications, not speculation
 - Highlight specific players who may benefit or face challenges
 - Note confidence level based on information quality

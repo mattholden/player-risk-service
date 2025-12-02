@@ -52,6 +52,9 @@ test-research-agent:
 test-analyst-agent:
 	python -m scripts.test_analyst_agent
 
+test-shark-agent:
+	python -m scripts.test_shark_agent
+
 streamlit:
 	streamlit run streamlit_app/app.py
 

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import json
 import re
+
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, Source, TeamAnalysis
 
@@ -23,12 +24,12 @@ class AnalystAgent:
     def analyze_injury_news(
         self,
         context: TeamContext, 
-        injury_news: list
+        injury_news: str
         ) -> TeamAnalysis:
         """
         Analyze injury news and determine the impact on a team's performance.
         """
-        print(f"\n🔍 Analyzing Fixture: {context.fixture}")
+        print(f"\n🔍 Anaylzing Fixture: {context.fixture}")
         print(f"   Fixture: {context.fixture}")
         print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
         print(f"   Team: {context.team}")
@@ -46,6 +47,9 @@ class AnalystAgent:
         try:
             response = self.grok_client.chat_completion(
                 messages=messages,
+                use_web_search=True,
+                use_x_search=True,
+                return_citations=True,
             )
             print("\n" + "="*70)
             print("🔍 DEBUG: Raw Grok Response")
@@ -70,15 +74,14 @@ class AnalystAgent:
         return text
 
 
-    def _build_user_message(self, injury_news: list, context: TeamContext) -> Dict[str, Any]:
+    def _build_user_message(self, injury_news: str, context: TeamContext) -> Dict[str, Any]:
         
         # Format injury news clearly
-        injury_summary = "\n".join([f"- {item}" for item in injury_news]) if injury_news else "- No significant injuries reported"
-        
         current_date = datetime.now().strftime("%B %d, %Y")
         
         prompt = f"""
-Analyze the tactical implications of reported injuries for this upcoming fixture.
+Analyze the tactical implications of reported injuries for this upcoming fixture. 
+Based on the severity of any injuries, determine if the team is likely to make any adjustments to their game strategy.
 
 **Match Details:**
 - Fixture: {context.fixture}
@@ -89,7 +92,7 @@ Analyze the tactical implications of reported injuries for this upcoming fixture
 - Season: 2025/2026
 
 **Injury Report:**
-{injury_summary}
+{injury_news}
 
 **Analysis Required:**
 
@@ -97,22 +100,24 @@ CRITICAL: Use ONLY 2025/2026 season data. Before analyzing replacements, verify 
 
 For {context.team}:
 - Which positions are affected?
-- Who are the likely replacements FROM THE CURRENT SQUAD?
-- How might the tactical setup change based on recent 2025/2026 matches?
+- If there are any serious injuries, who are the likely replacements FROM THE CURRENT SQUAD?
+- Are there minor injuries that are likely to be resolved in time for the fixture?
+- How might the coaches strategy change based on recent 2025/2026 matches?
 - Which players gain increased opportunity?
 
 For {context.opponent}:
-- How can they exploit these absences?
-- What tactical adjustments might they make based on their current season form?
+- If absences are expected, how can they exploit these absences?
+- What is the likelihood of any adjustments for any minor injuries?
+- What adjustments might they make to their game strategy based on their current season form?
 - Which opposition players become more important?
 
 Required research:
-1. Search for "{context.team} 2025/2026 squad" to verify current roster
-2. Search for "{context.opponent} 2025/2026 squad" to verify current roster
+1. Search for "{context.team} 2025/2026 squad" to verify most recent current roster
+2. Search for "{context.opponent} 2025/2026 squad" to verify most recent current roster
 3. Review recent match reports from the last month
 4. Check current season statistics and form
 
-Provide a comprehensive 1-2 paragraphreport covering:
+Provide a comprehensive 1-2 paragraph report covering:
 1. Key absences and their impact
 2. Likely lineup/tactical adjustments for both teams (based on current rosters)
 3. Players to watch (beneficiaries of increased opportunity)
@@ -152,10 +157,10 @@ Research priorities when using web search:
 - "current roster" + team name
 - Recent match reports (last 4-6 weeks)
 - Official club announcements
-- Current season statistics only
 
 Output requirements:
 - Write a concise analytical report (1-2 paragraphs)
+- Always use full names of players, not nicknames or abbreviations
 - Focus on tactical and strategic implications, not speculation
 - Highlight specific players who may benefit or face challenges
 - Note confidence level based on information quality

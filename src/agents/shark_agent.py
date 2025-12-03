@@ -3,7 +3,8 @@ from typing import Optional, Dict, Any, List
 import json
 
 from src.clients.grok_client import GrokClient
-from src.agents.models import Source, InjuryResearchFindings, TeamContext, TeamAnalysis, PlayerRisk
+from src.agents.models import Source, InjuryResearchFindings, TeamContext, TeamAnalysis, PlayerAlert
+from database.enums import AlertLevel
 
 class SharkAgent:
     """
@@ -20,9 +21,12 @@ class SharkAgent:
         self, 
         context: TeamContext,
         injury_news: List[str],
-        expert_analysis: str) -> PlayerRisk:
+        expert_analysis: str) -> List[PlayerAlert]:
         """
         Analyze the risk of a player playing in a fixture.
+        
+        Returns:
+            List of PlayerAlert objects with alert levels and descriptions
         """
         print(f"\n🔍 Analyzing Risk for {context.team}")
         print(f"   Fixture: {context.fixture}")
@@ -33,13 +37,23 @@ class SharkAgent:
         user_message = self._build_user_message(context, injury_news, expert_analysis)
         system_message = self._build_system_message()
         messages = [system_message, user_message]
-        response = self.grok_client.chat_completion(messages=messages)
+        response = self.grok_client.chat_completion(
+            messages=messages,
+            use_web_search=True,
+            use_x_search=True,
+            return_citations=True,
+        )
         content = response.get('content', '')
-        print("Content:")
+        print("\n" + "="*70)
+        print("🔍 DEBUG: Raw Shark Response")
+        print("="*70)
         print(content)
-        return None # TODO: Implement parsing of response
+        print("="*70 + "\n")
+        
+        # Parse the response into PlayerAlert objects
+        return self._parse_response(content, context)
 
-    def _build_user_message(self, context: TeamContext, injury_news: List[str], expert_analysis: str) -> Dict[str, Any]:
+    def _build_user_message(self, context: TeamContext, injury_news: str, expert_analysis: str) -> Dict[str, Any]:
         
         # Format injury news
         injury_summary = "\n".join([f"- {item}" for item in injury_news]) if injury_news else "- No significant injuries reported"
@@ -72,10 +86,10 @@ Consider:
 **Quality filters:**
 - Must be a meaningful edge (not just "might get 2 more minutes")
 - Impact should be quantifiable (usage, matchups, role changes)
-- Focus on players likely to have active prop markets
 - Exclude speculative or marginal impacts
 
-Return a JSON array of opportunities with alert levels. Be ruthless - only return players where you'd genuinely look for an edge.
+Return a JSON array of opportunities with alert levels. 
+Only return players where you'd genuinely look for an edge or want to keep on watch for more information to be released closer to the fixture.
 
 If no strong opportunities exist, return an empty array: []
 """
@@ -90,18 +104,18 @@ Your expertise: Finding market inefficiencies when sportsbooks fail to properly 
 **Alert Level Framework:**
 
 HIGH ALERT - Near-certain opportunity:
-- Player ruled OUT (guaranteed under on all props if lines exist)
-- Player confirmed as replacement starter (massive usage spike expected)
+- Player ruled OUT or has a long term injury
+- Player confirmed as a replacement starter (massive usage spike expected)
 - Clear role change with quantifiable impact
 
 MEDIUM ALERT - Strong edge potential:
-- Player questionable/doubtful (uncertainty = potential mispricing)
+- Player injury status is questionable (there is injury concern, but uncertainty about whether they will be available for the fixture)
 - Player returning from injury (minutes/usage uncertainty)
 - Significant role expansion due to teammate's absence
 - Opponent missing key defender matched up against this player
 
 LOW ALERT - Worth monitoring:
-- Minor role changes
+- Minor injuries that are likely to be resolved in time for the fixture
 - Indirect impact from injuries
 - Situational advantages that may not move lines enough
 
@@ -109,6 +123,7 @@ LOW ALERT - Worth monitoring:
 - Only identify players where injury news creates meaningful information asymmetry
 - Focus on situations where prop lines likely don't reflect new reality
 - Consider both direct impacts (injured players) and indirect (beneficiaries)
+- Always use full names of players, not nicknames or abbreviations
 - Be selective - return only actionable opportunities, not every affected player
 - One sentence explanations must be specific and actionable
 
@@ -129,8 +144,57 @@ Do not include players with no edge potential. Empty array if no opportunities e
             "content": prompt
         }
 
-    def _parse_response(self, content: str) -> List[PlayerRisk]:
+    def _parse_response(self, content: str, context: TeamContext) -> List[PlayerAlert]:
         """
-        Parse the response into a list of PlayerRisk objects.
+        Parse the JSON response into a list of PlayerAlert objects.
+        
+        Args:
+            content: JSON string from Grok containing player alerts
+            
+        Returns:
+            List of PlayerAlert objects with proper enum values
         """
-        return json.loads(content)
+        try:
+            # Parse the JSON string
+            data = json.loads(content)
+            
+            # If it's not a list, wrap it
+            if not isinstance(data, list):
+                data = [data]
+            
+            # Convert each dict to a PlayerAlert object
+            alerts = []
+            for item in data:
+                # Map the string alert_level to AlertLevel enum
+                alert_level_str = item.get('alert_level', 'low').lower()
+                
+                # Convert string to AlertLevel enum
+                alert_level_map = {
+                    'high': AlertLevel.HIGH_ALERT,
+                    'medium': AlertLevel.MEDIUM_ALERT,
+                    'low': AlertLevel.LOW_ALERT,
+                    'no_alert': AlertLevel.NO_ALERT,
+                }
+                alert_level = alert_level_map.get(alert_level_str, AlertLevel.LOW_ALERT)
+                
+                # Create PlayerAlert object (map 'reasoning' to 'description')
+                alert = PlayerAlert(
+                    player_name=item.get('player_name', ''),
+                    alert_level=alert_level,
+                    team=context.team,
+                    fixture=context.fixture,
+                    fixture_date=context.fixture_date,
+                    description=item.get('reasoning', item.get('description', ''))
+                )
+                alerts.append(alert)
+            
+            print(f"\n✅ Parsed {len(alerts)} player alerts")
+            return alerts
+            
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse JSON response: {e}")
+            print(f"   Content: {content[:200]}...")
+            return []
+        except Exception as e:
+            print(f"❌ Error parsing response: {e}")
+            return []

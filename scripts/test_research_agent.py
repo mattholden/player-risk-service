@@ -53,8 +53,10 @@ def test_research_agent(context: TeamContext):
     findings = agent.research_team(context, lookback_days=7)
     
     print("\n✅ Research completed successfully!")
-    print(f"   Timestamp: {findings.search_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   Confidence Score: {findings.confidence_score:.2f}")
+    print(type(findings.findings))
+    print(f"   Findings: {findings.findings}")
+    print(f"   Sources: {findings.sources}")
+    print(f"   Search Timestamp: {findings.search_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Rate limit status
     print_header("📊 API Usage")
@@ -62,7 +64,7 @@ def test_research_agent(context: TeamContext):
     print(f"\n   Requests made: {status['requests_made']}")
     print(f"   Remaining: {status['requests_remaining']}/{status['limit']}")
     
-    return findings.findings
+    return findings.findings['description']
 
 
 def main(save_responses: bool = False):

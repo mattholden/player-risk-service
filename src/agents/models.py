@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from enum import Enum as PyEnum
-from database.enums import RiskTag
+from database.enums import AlertLevel
 
 
 class PlayerContext(BaseModel):
@@ -75,19 +75,13 @@ class InjuryResearchFindings(BaseModel):
 
     team_name: str = Field(..., description = "Team being researched")
     fixture: str = Field(..., description = "Match fixture (e.g., 'Arsenal vs Brentford')")
-    findings: List[str] = Field(
-        default_factory=list, 
-        description = "List of findings"
+    findings: dict = Field(
+        default_factory=dict,
+        description = "Findings from the research as a dictionary"
         )
-    sources: List[Source] = Field(
+    sources: List[str] = Field(
         default_factory=list, 
         description = "List of sources"
-        )
-    confidence_score: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in findings (0.0 = no info, 1.0 = very confident)"
         )
     search_timestamp: datetime = Field(
         default_factory=datetime.now,
@@ -110,7 +104,7 @@ class InjuryResearchFindings(BaseModel):
                         "title": "Arsenal Official",
                     }
                 ],
-                "confidence_score": 0.85,
+                "search_timestamp": "2025-11-27T16:00:00"
             }
         }
 class ResearchFindings(BaseModel):
@@ -121,7 +115,7 @@ class ResearchFindings(BaseModel):
     This will be passed to the Assessment Agent for risk evaluation.
     """
     player_name: str = Field(..., description="Player being researched")
-    sources: List[Source] = Field(
+    sources: List[str] = Field(
         default_factory=list, 
         description="List of source citations found"
     )
@@ -181,12 +175,15 @@ class TeamAnalysis(BaseModel):
     fixture: str = Field(..., description="Fixture being analyzed")
     team_analysis: str = Field(..., description="Analysis of the team's performance")
     
-class PlayerRisk(BaseModel):
+class PlayerAlert(BaseModel):
     """
     Output from the shark agent
     """
     player_name: str = Field(..., description="Player being analyzed")
-    risk: RiskTag = Field(..., description="Risk of the player playing in the fixture")
+    team: str = Field(..., description="Team of the player")
+    fixture: str = Field(..., description="Fixture of the player")
+    fixture_date: datetime = Field(..., description="Date and time of the fixture")
+    alert_level: AlertLevel = Field(..., description="Risk of the player playing in the fixture")
     description: str = Field(..., description="Description of the risk")
 
 
@@ -194,7 +191,10 @@ class PlayerRisk(BaseModel):
         json_schema_extra = {
             "example": {
                 "player_name": "Jack Currie",
-                "risk": RiskTag.HIGH,
-                "description": "Jack Currie is injured and will be out for the next 2 weeks"
+                "team": "Oxford United",
+                "fixture": "Oxford United vs Ipswich Town",
+                "fixture_date": "2025-11-28T19:45:00",
+                "alert_level": AlertLevel.HIGH_ALERT,
+                "description": "Jack Currie is ruled out for the next 2 weeks"
             }
         }

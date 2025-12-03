@@ -24,8 +24,7 @@ def test_shark_agent(context: TeamContext, injury_news: List[str], analyst_agent
     print("\n📦 Initializing...")
     grok_client = GrokClient()
     agent = SharkAgent(grok_client)
-    agent.analyze_player_risk(context, injury_news, analyst_agent_response)
-    return
+    return agent.analyze_player_risk(context, injury_news, analyst_agent_response)
 
 def generate_team_contexts(fixture: str, fixture_date: datetime) -> List[TeamContext]:
     """Generate a team context for a fixture."""

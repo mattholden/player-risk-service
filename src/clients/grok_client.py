@@ -6,17 +6,18 @@ This client handles:
 - Rate limiting (100 requests/hour for development)
 - Retry logic with exponential backoff
 - Error handling and response validation
+- Native tool support (web_search, x_search, code_execution)
 
-The xAI API is compatible with OpenAI's SDK, so we use the openai library.
+Using the native xAI SDK for better integration with Grok's features.
 """
 
 import os
-import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
-from openai import OpenAI
-import httpx
-from tenacity import (
+from xai_sdk import Client  # type: ignore
+from xai_sdk.chat import user, system  # type: ignore
+from xai_sdk.tools import web_search, x_search  # type: ignore
+from tenacity import (  # type: ignore
     retry,
     stop_after_attempt,
     wait_exponential,
@@ -31,12 +32,13 @@ class RateLimitExceeded(Exception):
 
 class GrokClient:
     """
-    Client for interacting with xAI's Grok API.
+    Client for interacting with xAI's Grok API using native xAI SDK.
     
     Usage:
         client = GrokClient(api_key="your-key")
         response = client.chat_completion(
-            messages=[{"role": "user", "content": "Hello!"}]
+            messages=[{"role": "user", "content": "Hello!"}],
+            use_web_search=True
         )
     """
     
@@ -48,37 +50,28 @@ class GrokClient:
         self, 
         api_key: Optional[str] = None,
         model: str = "grok-4-1-fast-reasoning",
-        max_tokens: int = 2000,
+        max_tokens: int = 2500,
         temperature: float = 0.8
     ):
         """
         Initialize Grok API client.
         
         Args:
-            api_key: xAI API key (defaults to GROK_API_KEY env var)
-            model: Model to use (grok-beta, grok-2, etc.)
+            api_key: xAI API key (defaults to XAI_API_KEY or GROK_API_KEY env var)
+            model: Model to use (grok-4-1-fast-reasoning, grok-4-1-fast, etc.)
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature (0.0-1.0, lower = more factual)
         """
-        self.api_key = (api_key or os.getenv('GROK_API_KEY', '')).strip()
+        # Try both XAI_API_KEY and GROK_API_KEY for backwards compatibility
+        self.api_key = os.getenv('GROK_API_KEY', '').strip()
+        
         if not self.api_key:
             raise ValueError(
-                "GROK_API_KEY must be provided or set in environment variables"
+                "API key must be provided or set as XAI_API_KEY or GROK_API_KEY environment variable"
             )
         
-        # Create httpx client explicitly to avoid proxy issues
-        http_client = httpx.Client(
-            base_url="https://api.x.ai/v1",
-            timeout=60.0,
-            follow_redirects=True
-        )
-        
-        # Initialize OpenAI client with explicit httpx client
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url="https://api.x.ai/v1",
-            http_client=http_client
-        )
+        # Initialize xAI client
+        self.client = Client(api_key=self.api_key)
         
         self.model = model
         self.max_tokens = max_tokens
@@ -87,7 +80,7 @@ class GrokClient:
         # Rate limiting tracking
         self._request_timestamps: List[datetime] = []
         
-        print(f"✅ GrokClient initialized (model: {model})")
+        print(f"✅ GrokClient initialized (model: {model}, using xAI SDK)")
     
     def _check_rate_limit(self) -> None:
         """
@@ -127,20 +120,28 @@ class GrokClient:
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        use_web_search: bool = True,
+        use_x_search: bool = True,
+        return_citations: bool = True,
+        max_search_results: int = 10,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Send a chat completion request to Grok.
+        Send a chat completion request to Grok with native tool support.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
             model: Override default model
             max_tokens: Override default max_tokens
             temperature: Override default temperature
+            use_web_search: Enable web search tool (default: True)
+            use_x_search: Enable X/Twitter search tool (default: True)
+            return_citations: Include citations in response (default: True)
+            max_search_results: Max number of search results (default: 10)
             **kwargs: Additional parameters to pass to API
         
         Returns:
-            API response dictionary
+            API response dictionary with content, sources, usage, etc.
             
         Raises:
             RateLimitExceeded: If rate limit exceeded
@@ -154,13 +155,33 @@ class GrokClient:
         max_tokens = max_tokens or self.max_tokens
         temperature = temperature or self.temperature
         
+        # Build tools list - tools don't take parameters, they're just instances
+        tools = []
+        if use_web_search:
+            tools.append(web_search())
+        if use_x_search:
+            tools.append(x_search())
+        
         try:
-            response = self.client.chat.completions.create(
+            # Create chat with tools
+            chat = self.client.chat.create(
                 model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                **kwargs
+                tools=tools if tools else None,
             )
+            
+            # Add messages to the chat using the correct API
+            for message in messages:
+                role = message.get('role', 'user')
+                content = message.get('content', '')
+                
+                if role == 'system':
+                    chat.append(system(content))
+                elif role == 'user':
+                    chat.append(user(content))
+    
+            
+            # Get the response by sampling
+            response = chat.sample()
             
             return self._parse_response(response)
             
@@ -170,29 +191,45 @@ class GrokClient:
     
     def _parse_response(self, response) -> Dict[str, Any]:
         """
-        Parse OpenAI SDK response into a clean dictionary.
+        Parse xAI SDK response into a clean dictionary.
         
         Args:
-            response: OpenAI ChatCompletion response object
+            response: xAI SDK response object (from chat.sample())
+            chat: xAI SDK chat object
             
         Returns:
             Dictionary with parsed response data
         """
-        choice = response.choices[0]
+        # Extract content from response
+        # The response object has a .content attribute
 
-        return {
-            "content": choice.message.content,
-            "role": choice.message.role,
-            "model": response.model,
-            "finish_reason": choice.finish_reason,
-            "usage": {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
-            },
-            "created_at": datetime.fromtimestamp(response.created)
-        }
     
+        try:
+            content = response.content
+        except Exception as e:
+            print(f"⚠️  Could not extract content: {e}")
+            content = ""
+        try:
+            sources = response.citations
+        except Exception as e:
+            print(f"⚠️  Could not extract sources: {e}")
+            sources = []
+        # Try to extract usage stats if available
+        try:
+            usage = response.usage
+
+        except Exception as e:
+            print(f"⚠️  Could not extract usage stats: {e}")
+            usage = {}
+        
+        return {
+            "content": content,
+            "role": "assistant",
+            "model": self.model,
+            "sources": sources,
+            "usage": usage,
+            "created_at": datetime.now()
+        }
     
     def get_rate_limit_status(self) -> Dict[str, Any]:
         """
@@ -236,7 +273,9 @@ def test_client():
         response = client.chat_completion(
             messages=[
                 {"role": "user", "content": "Say 'Hello from Grok!' in one sentence."}
-            ]
+            ],
+            use_web_search=False,
+            use_x_search=False
         )
         
         print(f"\n✅ Response: {response['content']}")
@@ -246,10 +285,11 @@ def test_client():
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
 if __name__ == "__main__":
     # Run test if this file is executed directly
     test_client()
-

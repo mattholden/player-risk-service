@@ -77,19 +77,30 @@ class ResearchAgent:
         try:
             response = self.grok_client.chat_completion(
                 messages=messages,
+                use_web_search=False,
+                use_x_search=True,
+                return_citations=True
             )
+            # Parse the JSON string into a dictionary
+            try:
+                content_json = json.loads(response.get('content', '{}'))
+                print("\n" + "="*70)
+                print("🔍 DEBUG: Parsed JSON Response (dict)")
+                print("="*70)
+                print(json.dumps(content_json, indent=2))
+                print("="*70 + "\n")
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Failed to parse JSON response: {e}")
+                print(f"   Raw content: {response.get('content', '')[:200]}...")
+                content_json = {}
             
-            # DEBUG: Print raw response to see what Grok returned
-            print("\n" + "="*70)
-            print("🔍 DEBUG: Raw Grok Response")
-            print("="*70)
-            print(response.get('content', ''))  # First 1000 chars
-            print("="*70 + "\n")
-            
-            # Parse the response into structured findings
-            findings = self._parse_response(response, context)
-            
-            return findings
+            return InjuryResearchFindings(
+                team_name=context.team,
+                fixture=context.fixture,
+                findings=content_json,  # Now passing the parsed dictionary
+                sources=response.get('sources', []),
+                search_timestamp=datetime.now()
+            )
             
         except Exception as e:
             print(f"❌ Research failed: {e}")
@@ -99,7 +110,6 @@ class ResearchAgent:
                 fixture=context.fixture,
                 findings=[],
                 sources=[],
-                confidence_score=0.0,
                 search_timestamp=datetime.now()
             )
     
@@ -124,9 +134,9 @@ Search for injury news about {context.team} ahead of their match against {contex
 
 Focus on:
 - Squad availability and fitness updates
-- Players ruled out or doubtful
+- Players ruled out or have long term injuries
+- Players who have injuries whose status is questionable, pending more information
 - Players returning from injury
-- Players who have had persistent injuries
 - Training ground reports from the last {lookback_days} days
 
 Search timeframe: Last {lookback_days} days (from {search_from} to today)
@@ -163,163 +173,62 @@ Search sources: Team websites, news outlets, X (Twitter), sports forums, officia
 
 Requirements:
 - Prioritize information from the last 48 hours
+= Always use full names of players, not nicknames or abbreviations
 - Include source URLs for all information
-- Be objective - report only confirmed information, note speculation clearly
+- Prioritize confirmed information from official sources
+- Include relevant speculation or rumours, but note them as such in the description
 - If no recent news exists, state that explicitly
 
-Return findings as structured JSON:
+Return your findings in the following JSON format:
 {
-  "summaries": ["Concise finding 1", "Concise finding 2"],
-  "sources": [{"number": 1, "title": "Article title", "url": "https://...", "date": "YYYY-MM-DD"}]
+    "description": "1-2 paragraphs summarizing all news and speculation",
+    "confirmed_out": [
+        {
+            "player_name": "Player Name", 
+            "injury": "Reason for being out",
+            "status": "Status of the player",
+            "details": "Details of the injury",
+            "sources": ["Source 1", "Source 2", "Source 3"]
+        }
+    ],
+    "questionable": [
+        {
+            "player_name": "Player Name", 
+            "injury": "Reason for being questionable",
+            "status": "Status of the player",
+            "details": "Details of the injury",
+            "sources": ["Source 1", "Source 2", "Source 3"]
+        }
+    ],
+    "returned_to_training": [
+        {
+            "player_name": "Player Name", 
+            "injury": "Previous injury",
+            "status": "Status of the player",
+            "details": "Details of recovery",
+            "sources": ["Source 1", "Source 2", "Source 3"]
+        }
+    ],
+    "manager_comments": [
+        {
+            "source": "Source of comment",
+            "comment": "Manager's comments here"
+        }
+    ],
+    "speculation": [
+        {
+            "source": "Source of speculation",
+            "speculation": "Speculation here"
+        }
+    ]
 }
+
 """
         return {
             "role": "system",
             "content": prompt
         }
     
-    def _parse_response(
-        self, 
-        response: dict, 
-        context: TeamContext
-    ) -> InjuryResearchFindings:
-        """
-        Parse Grok's response into structured ResearchFindings.
-        
-        Args:
-            response: Raw response from Grok API
-            context: Original player context
-            
-        Returns:
-            Structured ResearchFindings object
-        """
-        content = response.get('content', '')
-        
-        # Try to extract JSON from the response
-        try:
-            # Grok might wrap JSON in markdown code blocks
-            if '```json' in content:
-                json_start = content.find('```json') + 7
-                json_end = content.find('```', json_start)
-                json_str = content[json_start:json_end].strip()
-                print("First Condition")
-            elif '```' in content:
-                json_start = content.find('```') + 3
-                json_end = content.find('```', json_start)
-                json_str = content[json_start:json_end].strip()
-                print("Second Condition")
-            elif '{' in content and '}' in content:
-                # Try to extract raw JSON
-                json_start = content.find('{')
-                json_end = content.rfind('}') + 1
-                json_str = content[json_start:json_end]
-                print("Third Condition")
-            else:
-                # No JSON found, create findings from raw text
-                print("Fourth Condition")
-                return self._create_findings_from_text(content, context)
-            
-            # Parse the JSON
-            data = json.loads(json_str)
-            
-            # Extract sources
-            sources = []
-            for src in data.get('sources', []):
-                try:
-                    sources.append(Source(
-                        url=src.get('url', ''),
-                        title=src.get('title', ''),
-                    ))
-                except Exception as e:
-                    print(f"⚠️  Could not parse source: {e}")
-                    continue
-            
-            # Create findings
-            return InjuryResearchFindings(
-                team_name=context.team,
-                fixture=context.fixture,
-                findings=data.get('summaries', []),
-                sources=data.get('sources', []),
-                confidence_score=data.get('confidence_score', 0.0),
-                search_timestamp=datetime.now()
-            )
-            
-        except Exception as e:
-            print(f"⚠️  JSON parsing failed: {e}")
-            print("   Falling back to text-based extraction")
-            return self._create_findings_from_text(content, context)
-    
-    def _create_findings_from_text(
-        self, 
-        content: str, 
-        context: TeamContext
-    ) -> InjuryResearchFindings:
-        """
-        Create findings from unstructured text when JSON parsing fails.
-        
-        Args:
-            content: Raw text content from Grok
-            context: Player context
-            
-        Returns:
-            Basic InjuryResearchFindings extracted from text
-        """
-        # Try to extract URLs from text
-        import re
-        urls = re.findall(r'https?://[^\s\)]+', content)
-        
-        # Create basic sources from URLs
-        sources = []
-        for url in urls[:10]:  # Limit to 10 sources
-            sources.append(Source(
-                url=url,
-                title="Source found in research",
-            ))
-        
-        # Use first 300 chars as summary
-        summary = content[:300] + "..." if len(content) > 300 else content
-        
-        # Try to extract key points (sentences with player name)
-        key_findings = []
-        sentences = content.split('.')
-        for sentence in sentences:  # Limit to 5 key findings
-            if context.name.split()[0] in sentence:  # Check for player's first name
-                key_findings.append(sentence.strip() + '.')
-        
-        return InjuryResearchFindings(
-            team_name=context.team,
-            fixture=context.fixture,
-            findings=key_findings if key_findings else ["Research completed but no structured findings available"],
-            sources=sources,
-            confidence_score=0.3,  # Low confidence for unstructured data
-            search_timestamp=datetime.now()
-        )
-    
-    def _parse_datetime(self, dt_string: Optional[str]) -> Optional[datetime]:
-        """
-        Parse datetime string with fallback handling.
-        
-        Args:
-            dt_string: Datetime string in various formats
-            
-        Returns:
-            Datetime object or None
-        """
-        if not dt_string:
-            return None
-        
-        try:
-            # Try ISO format first
-            return datetime.fromisoformat(dt_string.replace('Z', '+00:00'))
-        except:
-            try:
-                # Try common formats
-                from dateutil import parser
-                return parser.parse(dt_string)
-            except:
-                return None
-
-
 def test_agent():
     """Quick test function."""
     from dotenv import load_dotenv

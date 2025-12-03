@@ -5,7 +5,7 @@ Player database model.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, Index, Boolean, Text
 from database.base import Base
-from database.enums import RiskTag
+from database.enums import AlertLevel
 
 
 class Player(Base):
@@ -43,9 +43,9 @@ class Player(Base):
     
     # Risk assessment
     risk_tag = Column(
-        SQLEnum(RiskTag),
+        SQLEnum(AlertLevel),
         nullable=False,
-        default=RiskTag.UNKNOWN,
+        default=AlertLevel.NO_ALERT,
         index=True  # Fast queries by risk level
     )
     risk_explanation = Column(Text, nullable=True)

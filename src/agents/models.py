@@ -180,7 +180,6 @@ class PlayerAlert(BaseModel):
     Output from the shark agent
     """
     player_name: str = Field(..., description="Player being analyzed")
-    team: str = Field(..., description="Team of the player")
     fixture: str = Field(..., description="Fixture of the player")
     fixture_date: datetime = Field(..., description="Date and time of the fixture")
     alert_level: AlertLevel = Field(..., description="Risk of the player playing in the fixture")
@@ -191,7 +190,6 @@ class PlayerAlert(BaseModel):
         json_schema_extra = {
             "example": {
                 "player_name": "Jack Currie",
-                "team": "Oxford United",
                 "fixture": "Oxford United vs Ipswich Town",
                 "fixture_date": "2025-11-28T19:45:00",
                 "alert_level": AlertLevel.HIGH_ALERT,

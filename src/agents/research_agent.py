@@ -171,6 +171,16 @@ What to search for:
 
 Search sources: Team websites, news outlets, X (Twitter), sports forums, official announcements.
 
+Always verify squad rosters as of {current_date}.
+
+**Trusted Squad Roster Sources (in priority order):**
+1. Trusted Sportsgambler Lineup website: https://www.sportsgambler.com/lineups/football/
+2. Official club websites (e.g., arsenal.com/first-team, brentfordfc.com/players)
+3. Trusted Soccerway website: https://us.soccerway.com/
+4. Transfermarkt.com (most up-to-date transfer database)
+5. BBC Sport squad pages
+6. Sky Sports squad lists
+
 Requirements:
 - Prioritize information from the last 48 hours
 = Always use full names of players, not nicknames or abbreviations

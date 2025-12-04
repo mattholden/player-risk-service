@@ -22,6 +22,7 @@ help:
 	@echo "  make test-research  - Test Research Agent"
 	@echo "  make test-analyst   - Test Analyst Agent"
 	@echo "  make test-shark     - Test Shark Agent"
+	@echo "  make test-alert-save - Test Alert database save"
 	@echo ""
 	@echo "Pipeline:"
 	@echo "  make pipeline       - Run full agent pipeline"
@@ -59,6 +60,9 @@ test-analyst-agent:
 
 test-shark-agent:
 	python -m scripts.test_shark_agent
+
+test-alert-save:
+	python -m scripts.test_alert_save
 
 pipeline:
 	python -m src.services.agent_pipeline

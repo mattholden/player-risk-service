@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, List
 import json
 
 from src.clients.grok_client import GrokClient
-from src.agents.models import Source, InjuryResearchFindings, TeamContext, TeamAnalysis, PlayerAlert
+from src.agents.models import TeamContext, PlayerAlert
 from database.enums import AlertLevel
 
 class SharkAgent:
@@ -57,7 +57,7 @@ class SharkAgent:
         
         # Format injury news
         injury_summary = "\n".join([f"- {item}" for item in injury_news]) if injury_news else "- No significant injuries reported"
-        
+        current_date = datetime.now().strftime("%B %d, %Y")
         prompt = f"""
 Identify player prop betting opportunities from injury news for this fixture.
 
@@ -76,9 +76,20 @@ Identify player prop betting opportunities from injury news for this fixture.
 **Your Task:**
 Analyze the injury situation and expert analysis to identify players with potential betting line edges.
 
+**BEFORE adding any player to alerts:**
+1. If the analyst mentions a replacement player you're unfamiliar with, search verify their roster status as of {current_date}"
+2. Verify they're currently with the team (not transferred out as of {current_date})
+
+**Trusted Squad Roster Sources (in priority order):**
+1. Official club websites (e.g., arsenal.com/first-team, brentfordfc.com/players)
+2. Trusted Soccerway website: https://us.soccerway.com/
+3. Transfermarkt.com (most up-to-date transfer database)
+4. BBC Sport squad pages
+5. Sky Sports squad lists
+
 Consider:
 1. **Direct impacts** - Injured players with active prop lines (especially if ruled out)
-2. **Replacement starters** - Players gaining significant opportunity
+2. **Replacement starters** - Players gaining significant opportunity (VERIFY THEY'RE STILL WITH THE TEAM)
 3. **Usage beneficiaries** - Players likely to see increased targets/touches/minutes
 4. **Matchup advantages** - Players facing weakened opposition
 5. **Returning players** - Usage uncertainty creating mispriced lines
@@ -101,18 +112,32 @@ You are a sharp sports bettor ("shark") who specializes in identifying player pr
 
 Your expertise: Finding market inefficiencies when sportsbooks fail to properly adjust player lines based on injury reports and tactical changes.
 
+**CRITICAL VALIDATION REQUIREMENT:**
+Before including ANY player in your alerts, you MUST verify they are currently with the team in December 2025:
+- If the analyst mentions a player as a "likely replacement", search "[PLAYER NAME] [TEAM] transfer December 2025"
+- If you can't find recent evidence they're with the team, DO NOT include them
+- Only include players you can confirm are in the current squad
+
+**Trusted Sources for Verification:**
+1. Official team websites (e.g., arsenal.com/squad, brentfordfc.com/players)
+2. Transfermarkt.com (check for recent transfers)
+3. Recent match lineups (last 2-4 weeks)
+4. Premier League official squad lists
+
 **Alert Level Framework:**
 
 HIGH ALERT - Near-certain opportunity:
 - Player ruled OUT or has a long term injury
 - Player confirmed as a replacement starter (massive usage spike expected)
 - Clear role change with quantifiable impact
+- ONLY if you can verify the replacement player is currently with the team
 
 MEDIUM ALERT - Strong edge potential:
 - Player injury status is questionable (there is injury concern, but uncertainty about whether they will be available for the fixture)
 - Player returning from injury (minutes/usage uncertainty)
 - Significant role expansion due to teammate's absence
 - Opponent missing key defender matched up against this player
+- ONLY if player roster status is confirmed
 
 LOW ALERT - Worth monitoring:
 - Minor injuries that are likely to be resolved in time for the fixture
@@ -180,10 +205,9 @@ Do not include players with no edge potential. Empty array if no opportunities e
                 # Create PlayerAlert object (map 'reasoning' to 'description')
                 alert = PlayerAlert(
                     player_name=item.get('player_name', ''),
-                    alert_level=alert_level,
-                    team=context.team,
                     fixture=context.fixture,
                     fixture_date=context.fixture_date,
+                    alert_level=alert_level,
                     description=item.get('reasoning', item.get('description', ''))
                 )
                 alerts.append(alert)

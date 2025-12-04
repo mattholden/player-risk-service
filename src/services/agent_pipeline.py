@@ -5,7 +5,7 @@ from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext
 from datetime import datetime
 from typing import List
-from database import Player, session_scope
+from database import Alert, session_scope
 from src.agents.models import PlayerAlert
 class AgentPipeline:
     """
@@ -52,31 +52,35 @@ class AgentPipeline:
 
     def _save_alerts(self, alerts: List[PlayerAlert]):
         """Save the alerts to the database."""
+        print(f"\n💾 Saving {len(alerts)} alerts to database...")
+        
         with session_scope() as session:
+            saved_count = 0
             for alert in alerts:
-                player = Player(
-                    name=alert.player_name,
-                    team=alert.team,
+                player_alert = Alert(
+                    player_name=alert.player_name,
                     fixture=alert.fixture,
                     fixture_date=alert.fixture_date,
                     alert_level=alert.alert_level,
                     description=alert.description,
+                    last_alert_update=datetime.now(),
+                    acknowledged=False,
+                    active_projection=True, 
                     created_at=datetime.now()
                 )
-                session.add(player)
-            session.commit()
+                session.add(player_alert)
+                saved_count += 1
+        
+        print(f"✅ Saved {saved_count} player alerts to database")
 
-
-    def _print_alerts(self, alerts: List[PlayerAlert]):
-        """Print the alerts to the console."""
-        for alert in alerts:
-            print(f"Player: {alert.player_name}")
-            print(f"Alert Level: {alert.alert_level}")
-            print(f"Description: {alert.description}")
-            print("-"*70)
 
 if __name__ == "__main__":
+    import json
+    
     pipeline = AgentPipeline()
     alerts = pipeline.run("Arsenal vs Brentford", datetime(2025, 12, 3, 19, 45))
+    # Print as JSON (pretty)
+    for alert in alerts:
+        print(json.dumps(alert.model_dump(), indent=2, default=str))
+
     pipeline._save_alerts(alerts)
-    pipeline._print_alerts(alerts)

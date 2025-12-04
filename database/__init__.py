@@ -9,7 +9,7 @@ This package contains all database-related code:
 
 # Import and expose key components
 from database.base import Base
-from database.models import Article, Player
+from database.models import Article, Player, Alert
 from database.enums import AlertLevel
 from database.database import (
     DatabaseManager,
@@ -22,6 +22,7 @@ __all__ = [
     'Base',
     'Article',
     'Player',
+    'Alert',
     'AlertLevel',
     'DatabaseManager',
     'db_manager',

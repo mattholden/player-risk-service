@@ -1,4 +1,4 @@
-.PHONY: help test test-article test-player test-grok test-research init-db docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline
+.PHONY: help test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -9,6 +9,7 @@ help:
 	@echo ""
 	@echo "Database:"
 	@echo "  make init-db        - Initialize database tables"
+	@echo "  make db-reset       - Reset database (drops all tables!)"
 	@echo "  make db-shell       - Open PostgreSQL shell"
 	@echo "  make db-tables      - List all tables"
 	@echo "  make db-articles    - View all articles"
@@ -23,6 +24,7 @@ help:
 	@echo "  make test-analyst   - Test Analyst Agent"
 	@echo "  make test-shark     - Test Shark Agent"
 	@echo "  make test-alert-save - Test Alert database save"
+	@echo "  make test-roster-sync - Test Roster sync service"
 	@echo ""
 	@echo "Pipeline:"
 	@echo "  make pipeline       - Run full agent pipeline"
@@ -39,6 +41,9 @@ docker-down:
 
 init-db:
 	python -m scripts.init_db
+
+db-reset:
+	@echo "yes" | python -m scripts.init_db --reset
 
 test:
 	python run_tests.py
@@ -66,6 +71,9 @@ test-alert-save:
 
 pipeline:
 	python -m src.services.agent_pipeline
+
+test-roster-sync:
+	python -m src.services.roster_sync
 
 streamlit:
 	streamlit run streamlit_app/app.py

@@ -8,15 +8,14 @@ Centralizing enums here makes them easy to reuse and maintain.
 from enum import Enum as PyEnum
 
 
-class RiskTag(PyEnum):
+class AlertLevel(PyEnum):
     """
-    Player risk level classification.
+    Player alert level classification.
     
-    Values represent the current assessed risk level for a player
+    Values represent the current assessed alert level for a player
     based on recent news articles and LLM analysis.
     """
-    NO_RISK = "no_risk"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    UNKNOWN = "unknown"  # Default when no assessment available
+    NO_ALERT = "no_alert"
+    LOW_ALERT = "low"
+    MEDIUM_ALERT = "medium"
+    HIGH_ALERT = "high"

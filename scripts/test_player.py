@@ -9,7 +9,7 @@ Or:
     python scripts/test_player.py
 """
 
-from database import Player, RiskTag, session_scope
+from database import Player, AlertLevel, session_scope
 from datetime import datetime
 
 def test_player_crud():
@@ -28,7 +28,7 @@ def test_player_crud():
             position="SG",
             fixture="Pistons vs Lakers",
             fixture_date=datetime(2025, 12, 25, 19, 30),
-            risk_tag=RiskTag.LOW,
+            risk_tag=AlertLevel.LOW_ALERT,
             risk_explanation="No recent injury reports",
             acknowledged=False,
             active_projection=True
@@ -54,7 +54,7 @@ def test_player_crud():
     print("\n3. Updating player risk...")
     with session_scope() as session:
         player = session.query(Player).filter_by(name="Jaden Ivey").first()
-        player.risk_tag = RiskTag.HIGH
+        player.risk_tag = AlertLevel.HIGH_ALERT
         player.risk_explanation = "Minor ankle injury reported"
         player.last_risk_update = datetime.now()
     
@@ -64,7 +64,7 @@ def test_player_crud():
     print("\n4. Verifying update...")
     with session_scope() as session:
         player = session.query(Player).filter_by(name="Jaden Ivey").first()
-        if player.risk_tag == RiskTag.HIGH:
+        if player.risk_tag == AlertLevel.HIGH_ALERT:
             print(f"✅ Risk correctly updated to: {player.risk_tag.value}")
         else:
             print(f"❌ Update failed! Risk is: {player.risk_tag.value}")

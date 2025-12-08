@@ -209,3 +209,6 @@ __marimo__/
 # Docker
 docker-compose.override.yml
 .docker/
+
+# Temporary test outputs
+tmp/

@@ -9,7 +9,8 @@ This package contains all database-related code:
 
 # Import and expose key components
 from database.base import Base
-from database.models import Article, Player, RiskTag
+from database.models import Article, Player, Alert
+from database.enums import AlertLevel
 from database.database import (
     DatabaseManager,
     db_manager,
@@ -21,7 +22,8 @@ __all__ = [
     'Base',
     'Article',
     'Player',
-    'RiskTag',
+    'Alert',
+    'AlertLevel',
     'DatabaseManager',
     'db_manager',
     'get_session',

@@ -19,7 +19,6 @@ class Article(Base):
         published_at: When the article was published
         source: Name of the news source
         author: Article author (nullable)
-        content: Article content snippet (nullable)
         created_at: When we saved this article to our database
         updated_at: When we last updated this article
     """
@@ -36,7 +35,6 @@ class Article(Base):
     published_at = Column(DateTime, nullable=True)
     source = Column(String(200), nullable=True)
     author = Column(String(200), nullable=True)
-    content = Column(Text, nullable=True)
     
     # Tracking timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -68,7 +66,6 @@ class Article(Base):
             'published_at': self.published_at.isoformat() if self.published_at else None,
             'source': self.source,
             'author': self.author,
-            'content': self.content,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

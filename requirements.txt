@@ -10,6 +10,11 @@ xai-sdk>=1.4.0  # xAI SDK for Grok with native tool support (web_search, x_searc
 pydantic==2.10.0  # Data validation and settings
 tenacity==8.5.0  # Retry logic with exponential backoff (compatible with Streamlit)
 
+# Web Scraping
+playwright==1.49.0  # Browser automation for JavaScript-heavy sites
+beautifulsoup4==4.12.3  # HTML parsing
+lxml==5.3.0  # Fast HTML parser backend for BeautifulSoup
+
 # API Framework (future)
 # fastapi==0.104.1
 # uvicorn==0.24.0

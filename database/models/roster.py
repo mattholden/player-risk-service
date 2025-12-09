@@ -41,7 +41,7 @@ class Roster(Base):
     player_name = Column(String(200), nullable=False)
     team = Column(String(200), nullable=False)
     league = Column(String(100), nullable=False)
-    position = Column(String(10), nullable=True)
+    position = Column(String(50), nullable=True)  # e.g., "Central Midfield", "Attacking Midfield"
     
     # Active status and date tracking
     is_active = Column(Boolean, nullable=False, default=True, index=True)

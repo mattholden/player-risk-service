@@ -1,7 +1,10 @@
-.PHONY: help test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync test-transfermarkt test-roster-update
 
 help:
 	@echo "Player Risk Service - Available Commands"
+	@echo ""
+	@echo "Setup:"
+	@echo "  make setup          - Install dependencies + Playwright browser"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-up      - Start Docker services"
@@ -32,6 +35,10 @@ help:
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
 	@echo "  make clean          - Remove Python cache files"
+
+setup:
+	pip install -r requirements.txt
+	playwright install chromium
 
 docker-up:
 	docker-compose up -d
@@ -74,6 +81,12 @@ pipeline:
 
 test-roster-sync:
 	python -m src.services.roster_sync
+
+test-transfermarkt:
+	python -m src.services.transfermarkt_scraper
+
+test-roster-update:
+	python -m src.services.roster_update
 
 streamlit:
 	streamlit run streamlit_app/app.py

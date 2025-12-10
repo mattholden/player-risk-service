@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync test-transfermarkt test-roster-update
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync test-transfermarkt test-roster-update test-custom-tool
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -88,6 +88,12 @@ test-transfermarkt:
 test-roster-update:
 	python -m src.services.roster_update
 
+test-custom-tool:
+	python -m scripts.test_custom_tool
+
+test-roster-tool:
+	python -m scripts.test_roster_tool
+
 streamlit:
 	streamlit run streamlit_app/app.py
 
@@ -115,4 +121,18 @@ db-articles:
 db-players:
 	@echo "Players in database:"
 	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, name, team, risk_tag, fixture FROM players ORDER BY created_at DESC;"
+
+db-teams:
+	@echo "Teams in database:"
+	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, team_name, league, transfermarkt_id, transfermarkt_slug, is_active FROM teams ORDER BY league, team_name;"
+
+# Team lookup - search Transfermarkt for team data
+# Usage: make team-lookup TEAM="Manchester City" LEAGUE="Premier League"
+team-lookup:
+	python -m src.services.team_lookup "$(TEAM)" "$(LEAGUE)"
+
+# Team lookup and save to database
+# Usage: make team-add TEAM="Manchester City" LEAGUE="Premier League"
+team-add:
+	python -m src.services.team_lookup "$(TEAM)" "$(LEAGUE)" --save
 

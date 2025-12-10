@@ -35,7 +35,7 @@ def print_header(title: str):
 
 
 def test_research_agent(context: TeamContext):
-    """Test research for Matt Phillips - Oxford United."""
+    """Test research agent"""
     print_header(f"🔬 Research Agent Test - {context.team}")
     
     # Initialize components
@@ -67,16 +67,13 @@ def test_research_agent(context: TeamContext):
     return findings.findings['description']
 
 
-def main(save_responses: bool = False):
+def main(save_responses: bool = False, fixture: str = None, fixture_date: datetime = None):
     """Run the test suite."""
     
     print("\n" + "="*70)
     print("🚀 Research Agent Testing Suite")
     print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
-
-    fixture = "Arsenal vs Brentford"
-    fixture_date = datetime(2025, 12, 3, 19, 45)
     
     if save_responses:
         try:
@@ -127,6 +124,10 @@ def save_response(response, filename: str):
 
 if __name__ == "__main__":
     import sys
-    success = main(save_responses=True)
+    success = main(
+        save_responses=False,
+        fixture = "Liverpool vs Brighton & Hove Albion",
+        fixture_date = datetime(2025, 12, 13, 00, 00)
+        )
     sys.exit(0 if success else 1)
 

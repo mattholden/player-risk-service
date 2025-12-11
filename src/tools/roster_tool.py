@@ -36,9 +36,9 @@ class ActiveRosterTool(BaseTool):
     @property
     def description(self) -> str:
         return (
-            "Get the current active roster for a sports team. "
+            "Get the current active roster for a sports team."
             "Returns a list of players currently on the team with their positions. "
-            "Use this when you need to know who plays for a team or check player availability."
+            "Use this when you need to know who currently plays for a team."
         )
     
     @property
@@ -70,7 +70,8 @@ class ActiveRosterTool(BaseTool):
             JSON string with roster data
         """
         try:
-            roster = self.roster_service.get_active_roster(team, league)
+            db_team_name = self.team_name_lookup(team)
+            roster = self.roster_service.get_active_roster(db_team_name, league)
             
             # Format for LLM consumption
             players = [
@@ -94,4 +95,12 @@ class ActiveRosterTool(BaseTool):
                 "team": team,
                 "league": league
             })
-
+    
+    def team_name_lookup(self, team: str) -> str:
+        """
+        Match the provided team name with the team name in the database.
+        """
+        team_name_lookup = {
+            "Liverpool": "Liverpool FC",
+        }
+        return team_name_lookup.get(team, team)

@@ -25,6 +25,7 @@ from tenacity import (  # type: ignore
     wait_exponential,
     retry_if_exception_type
 )
+from xai_sdk.proto import chat_pb2
 
 
 class RateLimitExceeded(Exception):
@@ -267,6 +268,7 @@ class GrokClient:
             chat = self.client.chat.create(
                 model=model,
                 tools=tools if tools else None,
+
             )
             
             # Add messages to the chat
@@ -392,7 +394,9 @@ class GrokClient:
 
         chat = self.client.chat.create(
             model=model,
-            tools=tools if tools else None
+            tools=tools if tools else None,
+            reasoning_effort="high",
+            max_turns=5,
         )
 
         for message in messages:
@@ -406,32 +410,42 @@ class GrokClient:
             client_side_tool_calls = []
             for response, chunk in chat.stream():
                 if chunk.content:
-                    print(chunk.content, end="", flush=True)
+                    print(f"{chunk.content}", end="", flush=True)
+
+                if chunk.reasoning_content:
+                    print(f"{chunk.reasoning_content}", end="", flush=True)
 
                 for tool_call in chunk.tool_calls:
                     tool_type = get_tool_call_type(tool_call)
-                    print(f"TOOL TYPE: {tool_type}\n\n")
+                    print(f"TOOL TYPE: {tool_type}\n")
                     if tool_type == "client_side_tool":
                         client_side_tool_calls.append(tool_call)
+                        print(f"Client Tool: {tool_call.function.name}\n")
                     else:
-                        print(f"\n[Server tool: {tool_call.function.name}]")
+                        print(f"[Server tool: {tool_call.function.name}]\n")
 
                 # Add the response to conversation history
             chat.append(response)
             
             # If no client-side tools were called, we're done
-            print(f"CLIENT SIDE TOOL CALLS: {client_side_tool_calls}\n\n")
+            print(f"CLIENT SIDE TOOL CALLS: {client_side_tool_calls}")
             if not client_side_tool_calls:
                 break
             
             # Execute your custom tools and add results
             for tool_call in client_side_tool_calls:
-                print(f"\n[Calling: {tool_call.function.name}]")
-                result = tool_registry.execute(tool_call.function.name, json.loads(tool_call.function.arguments))
+                print(f"\n[Calling: {tool_call.function.name}]\n")
+                if tool_call.function.name in custom_tools_names:
+                    result = tool_registry.execute(tool_call.function.name, json.loads(tool_call.function.arguments))
+                    chat.append(tool_result(result))
+                else:
+                    print(f"UNKNOWN CUSTOM TOOL: {tool_call.function.name}\n")
+                    continue
+        
+        print(f"Number of messages: {len(chat.messages)}")
+        for i, msg in enumerate(chat.messages):
+            print(f"[{i}] Role: {msg.role}, No Tool Calls: {len(msg.tool_calls)}, Tool Used: {msg.tool_calls}")
 
-                chat.append(tool_result(result))
-
-        print(f"FINAL MESSAGE: {response}\n\n")
         return {
             "content": response.content,
             "role": "assistant",

@@ -126,7 +126,7 @@ if __name__ == "__main__":
     import sys
     success = main(
         save_responses=False,
-        fixture = "Liverpool vs Brighton & Hove Albion",
+        fixture = "Liverpool FC vs Brighton & Hove Albion",
         fixture_date = datetime(2025, 12, 13, 00, 00)
         )
     sys.exit(0 if success else 1)

@@ -173,6 +173,8 @@ class RosterSyncService:
                 Roster.league == league,
                 Roster.is_active.is_(True)
             ).all()
+
+            print(f"ROSTER FOUND: {roster}\n")
             
             return [r.to_dict() for r in roster]
     

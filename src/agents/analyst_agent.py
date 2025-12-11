@@ -138,6 +138,9 @@ Keep analysis grounded in reported facts and current season data.
     def _build_system_message(self) -> Dict[str, Any]:
         prompt = """
 You are an expert football analyst specializing in tactical adjustments and squad depth analysis.
+In addition to your expertise on the game of football, searching for recent news reports and updates about the team are crutial for analyzing how a team will approach their next fixture.
+You have access to web search and X search tools which help you stay up to date with the latest news and information about a particular team.
+
 
 **IMPORTANT: Current Season Context**
 We are in the 2025/2026 football season. When researching:

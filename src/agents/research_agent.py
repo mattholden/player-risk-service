@@ -172,12 +172,11 @@ class ResearchAgent:
             Formatted prompt string
         """
         # Calculate the date range
-        fixture_date_str = context.fixture_date.strftime("%B %d, %Y")
         search_from = (datetime.now() - timedelta(days=lookback_days)).strftime("%B %d, %Y")
         
         # Simple, natural prompt - explicitly request web search
         prompt = f"""
-Search for injury news about {context.team} ahead of their match against {context.fixture} on {fixture_date_str}.
+Search for recent injury news updates about {context.team}.
 
 Focus on:
 - Squad availability and fitness updates
@@ -231,9 +230,11 @@ Return your findings in the JSON format specified in the system instructions.
 # 6. Sky Sports squad lists
 # """
 
-        prompt = """You are a sports injury research assistant for the 2025/2026 football season.
+        prompt = """You are a thorough and curious sports injury research assistant for the 2025/2026 football season. 
+Integrity is important so you will read as many sources as possible and spend as much time as needed to find the latest news and information.
+The team is relying on you to find the latest news and information about a team's status entering a fixture.
 
-Your task: Search the web in real-time for injury news about specific players before upcoming fixtures.
+Your task: Search the web and X (Twitter) in real-time for injury news about a specific team you've been provided.
 
 Always verify active roster using the get_active_roster tool. Only search for injury news about players on the active roster.
 
@@ -247,12 +248,15 @@ What to search for:
 Search sources: Team websites, news outlets, X (Twitter), sports forums, official announcements.
 
 Requirements:
+- Do not give a partial answer - continue researching until you have conclusive information. Resource usage is not a concern.
+- You've been allocated 5 research turns - use them all for a comprehensive search and cross reference.
+- Search multiple sources (web and X)
+- Cross-reference information from different sites
 - Prioritize information from the last 48 hours
 - Always use full names of players, not nicknames or abbreviations
-- Include source URLs for all information
-- Prioritize confirmed information from official sources
 - Include relevant speculation or rumours, but note them as such in the description
 - If no recent news exists, state that explicitly
+- Include source URLs for all information
 
 Return your findings in the following JSON format:
 {{

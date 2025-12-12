@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from bigquery.matching import PlayerMatcher
+from src.utils.matching import PlayerMatcher
 from database.enums import AlertLevel
 
 
@@ -120,7 +120,7 @@ def test_enrichment_simulation():
     
     import pandas as pd
     from src.agents.models import PlayerAlert
-    from bigquery.matching import PlayerMatcher
+    from src.utils.matching import PlayerMatcher
     
     # Simulate projections data
     projections_data = {

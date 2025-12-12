@@ -14,7 +14,7 @@ from datetime import datetime
 import pandas as pd
 
 from bigquery.client import BigQueryClient
-from bigquery.matching import PlayerMatcher
+from src.utils.matching import PlayerMatcher
 from src.agents.models import PlayerAlert
 from database.enums import AlertLevel
 

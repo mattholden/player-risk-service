@@ -1,5 +1,5 @@
 """
-Player name matching utilities for projections-to-alerts matching.
+Player name matching utilities.
 
 Handles the complexity of matching player names between different
 data sources which may have:

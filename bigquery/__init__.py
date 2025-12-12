@@ -9,11 +9,9 @@ This module handles:
 
 from bigquery.client import BigQueryClient
 from bigquery.projections_service import ProjectionsService
-from bigquery.matching import PlayerMatcher
 
 __all__ = [
     "BigQueryClient",
     "ProjectionsService",
-    "PlayerMatcher",
 ]
 

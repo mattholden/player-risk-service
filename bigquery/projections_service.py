@@ -67,6 +67,45 @@ class ProjectionsService:
         self.source_table_id = f"{project_id}.{self.source_dataset}.{self.source_table}"
         self.dest_table_id = f"{project_id}.{self.dest_dataset}.{self.dest_table}"
     
+    def get_upcoming_fixtures(
+        self,
+        fixture_column: str = "fixture",
+        match_time_column: str = "match_time"
+    ) -> list[dict]:
+        """
+        Get distinct upcoming fixtures from the projections table.
+        
+        Returns fixtures with their match times, useful for determining
+        which fixtures to process through the agent pipeline.
+        
+        Args:
+            fixture_column: Column name for fixture in source table
+            match_time_column: Column name for match time in source table
+            
+        Returns:
+            list[dict]: List of fixtures with keys 'fixture' and 'match_time'
+                Example: [
+                    {'fixture': 'Arsenal vs Brentford', 'match_time': '2025-12-03 19:45:00'},
+                    {'fixture': 'Liverpool vs Brighton', 'match_time': '2025-12-04 20:00:00'}
+                ]
+        """
+        query = f"""
+            SELECT DISTINCT 
+                {fixture_column} as fixture,
+                {match_time_column} as match_time
+            FROM `{self.source_table_id}`
+            ORDER BY {match_time_column}
+        """
+        
+        print("📅 Fetching upcoming fixtures from BigQuery...")
+        
+        df = self.client.query(query)
+        fixtures = df.to_dict(orient="records")
+        
+        print(f"   Found {len(fixtures)} fixtures")
+        
+        return fixtures
+    
     def get_projections(
         self,
         fixture: Optional[str] = None,

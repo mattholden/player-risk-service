@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync test-transfermarkt test-roster-update test-custom-tool
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -30,7 +30,12 @@ help:
 	@echo "  make test-roster-sync - Test Roster sync service"
 	@echo ""
 	@echo "Pipeline:"
-	@echo "  make pipeline       - Run full agent pipeline"
+	@echo "  make pipeline          - Run full projection alert pipeline"
+	@echo "  make pipeline-dry-run  - Run pipeline without writing to DB/BigQuery"
+	@echo "  make pipeline-fixtures - Fetch and display fixtures only"
+	@echo ""
+	@echo "BigQuery:"
+	@echo "  make test-bigquery     - Test BigQuery integration"
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -77,7 +82,16 @@ test-alert-save:
 	python -m scripts.test_alert_save
 
 pipeline:
-	python -m src.services.agent_pipeline
+	python -m src.pipeline
+
+pipeline-dry-run:
+	python -m src.pipeline --dry-run
+
+pipeline-fixtures:
+	python -m src.pipeline --fixtures-only
+
+test-bigquery:
+	python -m scripts.test_bigquery
 
 test-roster-sync:
 	python -m src.services.roster_sync

@@ -78,7 +78,7 @@ if __name__ == "__main__":
     import json
     
     pipeline = AgentPipeline()
-    alerts = pipeline.run("Arsenal vs Brentford", datetime(2025, 12, 3, 19, 45))
+    alerts = pipeline.run("Liverpool vs Brighton & Hove Albion", datetime(2025, 12, 13, 00, 00))
     # Print as JSON (pretty)
     for alert in alerts:
         print(json.dumps(alert.model_dump(), indent=2, default=str))

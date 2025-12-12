@@ -14,15 +14,18 @@ Using the native xAI SDK for better integration with Grok's features.
 import os
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
+import json
 from xai_sdk import Client  # type: ignore
-from xai_sdk.chat import user, system  # type: ignore
+from xai_sdk.chat import user, system, tool_result  # type: ignore
 from xai_sdk.tools import web_search, x_search  # type: ignore
+from xai_sdk.tools import get_tool_call_type  # type: ignore
 from tenacity import (  # type: ignore
     retry,
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type
 )
+from xai_sdk.proto import chat_pb2
 
 
 class RateLimitExceeded(Exception):
@@ -44,7 +47,11 @@ class GrokClient:
     
     # Rate limiting settings
     MAX_REQUESTS_PER_HOUR = 100
-    REQUEST_WINDOW_SECONDS = 3600  # 1 hour
+    REQUEST_WINDOW_SECONDS = 3600
+    NATIVE_TOOLS = {
+                    'web_search', 'x_search', 'x_semantic_search', 
+                    'x_keyword_search', 'analyze_x_posts'
+                }  # 1 hour
     
     def __init__(
         self, 
@@ -189,6 +196,266 @@ class GrokClient:
             print(f"❌ Grok API error: {e}")
             raise
     
+    def chat_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tool_registry: Optional[Any] = None,
+        model: Optional[str] = None,
+        use_web_search: bool = True,
+        use_x_search: bool = True,
+        max_iterations: int = 10,
+        verbose: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Chat with custom tools enabled. Runs an agent loop that continues
+        until the LLM is done reasoning (no more tool calls).
+        
+        This method:
+        1. Creates a chat with native tools + custom tools from registry
+        2. Runs the agent loop (multiple sample() calls as needed)
+        3. Executes custom tool calls via the registry
+        4. Returns the final response when LLM is done
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            tool_registry: ToolRegistry instance with registered tools
+            model: Override default model
+            use_web_search: Enable web search tool (default: True)
+            use_x_search: Enable X/Twitter search tool (default: True)
+            max_iterations: Max agent loop iterations (default: 10)
+            verbose: Print debug output (default: False)
+            **kwargs: Additional parameters
+            
+        Returns:
+            API response dictionary with content, sources, usage, etc.
+            
+        Raises:
+            RateLimitExceeded: If rate limit exceeded
+            Exception: If API call fails or max iterations reached
+        """
+        # Check rate limit
+        self._check_rate_limit()
+        
+        # Use defaults if not overridden
+        model = model or self.model
+        
+        # Build tools list
+        tools = []
+        
+        # Add custom tools from registry
+        if tool_registry:
+            custom_tools = tool_registry.get_all_protobufs()
+            tools.extend(custom_tools)
+            if verbose:
+                print(f"   🔧 Loaded {len(custom_tools)} custom tools: {tool_registry.get_tool_names()}")
+        
+        # IMPORTANT: Don't mix native and custom tools - they conflict
+        # Native tools should be used via chat_completion() separately
+        if (use_web_search or use_x_search) and tool_registry:
+            if verbose:
+                print("   ⚠️  Native tools (web/X search) disabled when custom tools are present")
+                print("      Use chat_completion() separately for web/X searches")
+        elif use_web_search or use_x_search:
+            # Only add native tools if NO custom tools
+            if use_web_search:
+                tools.append(web_search())
+            if use_x_search:
+                tools.append(x_search())
+        
+        try:
+            # Create chat with all tools
+            chat = self.client.chat.create(
+                model=model,
+                tools=tools if tools else None,
+
+            )
+            
+            # Add messages to the chat
+            for message in messages:
+                role = message.get('role', 'user')
+                content = message.get('content', '')
+                
+                if role == 'system':
+                    chat.append(system(content))
+                elif role == 'user':
+                    chat.append(user(content))
+            
+            # Run the agent loop
+            for iteration in range(1, max_iterations + 1):
+                if verbose:
+                    print(f"\n   🔄 Agent Loop - Iteration {iteration}")
+                
+                # Check rate limit for each iteration
+                self._check_rate_limit()
+                
+                # Get response from LLM
+                response = chat.sample()
+                
+                # Check if LLM is done (no tool calls)
+                if not response.tool_calls:
+                    if verbose:
+                        print("   ✅ LLM finished reasoning")
+                    return self._parse_response(response)
+                
+                # Native tools that are handled server-side by xAI
+                
+                # Separate custom tool calls from native tool calls
+                custom_tool_calls = [
+                    tc for tc in response.tool_calls 
+                    if tc.function.name not in self.NATIVE_TOOLS
+                ]
+                native_tool_calls = [
+                    tc for tc in response.tool_calls 
+                    if tc.function.name in self.NATIVE_TOOLS
+                ]
+                
+                if verbose:
+                    print(f"   🔧 Processing {len(response.tool_calls)} tool call(s)")
+                    if native_tool_calls:
+                        print(f"      ℹ️  {len(native_tool_calls)} native tool(s) - handled server-side")
+                
+                # Only process custom tools client-side
+                for tc in custom_tool_calls:
+                    tool_name = tc.function.name
+                    try:
+                        arguments = json.loads(tc.function.arguments)
+                    except json.JSONDecodeError:
+                        arguments = {}
+                    
+                    if verbose:
+                        print(f"      → {tool_name}({arguments})")
+                    
+                    # Execute the tool via registry
+                    if tool_registry:
+                        result = tool_registry.execute(tool_name, arguments)
+                    else:
+                        result = json.dumps({"error": f"No registry for tool: {tool_name}"})
+                    
+                    if verbose:
+                        result_preview = result[:100] + "..." if len(result) > 100 else result
+                        print(f"      ← {result_preview}")
+                    
+                    # Append result to chat
+                    chat.append(tool_result(result))
+            
+            # Max iterations reached
+            raise Exception(f"Agent loop exceeded max iterations ({max_iterations})")
+            
+        except Exception as e:
+            print(f"❌ Grok API error: {e}")
+            raise
+
+    def chat_with_streaming(
+            self,
+            messages: List[Dict[str, str]],
+            tool_registry: Optional[Any] = None,
+            model: Optional[str] = None,
+            use_web_search: bool = True,
+            use_x_search: bool = True,
+            max_iterations: int = 10,
+            verbose: bool = False,
+            **kwargs
+        ) -> Dict[str, Any]:
+        """
+        Chat with streaming response from Grok.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            tool_registry: ToolRegistry instance with registered tools
+            model: Override default model
+            use_web_search: Enable web search tool (default: True)
+            use_x_search: Enable X/Twitter search tool (default: True)
+            max_iterations: Max agent loop iterations (default: 10)
+            verbose: Print debug output (default: False)
+            **kwargs: Additional parameters
+        """
+        # Check rate limit
+        self._check_rate_limit()
+        
+        # Use defaults if not overridden
+        model = model or self.model
+        
+        # Build tools list
+        tools = []
+        if use_web_search:
+            tools.append(web_search())
+        if use_x_search:
+            tools.append(x_search())
+        
+        # Add custom tools from registry
+        if tool_registry:
+            custom_tools = tool_registry.get_all_client_side_tools()
+            custom_tools_names = tool_registry.get_tool_names()
+            tools.extend(custom_tools)
+            if verbose:
+                print(f"   🔧 Loaded {len(custom_tools)} custom tools: {tool_registry.get_tool_names()}")
+                print(f"   🔧 Custom tools: {custom_tools}\n\n")
+
+        chat = self.client.chat.create(
+            model=model,
+            tools=tools if tools else None,
+            reasoning_effort="high",
+            max_turns=5,
+        )
+
+        for message in messages:
+            role = message.get('role', 'user')
+            content = message.get('content', '')
+            if role == 'system':
+                chat.append(system(content))
+            elif role == 'user':
+                chat.append(user(content))
+        while True:
+            client_side_tool_calls = []
+            for response, chunk in chat.stream():
+                if chunk.content:
+                    print(f"{chunk.content}", end="", flush=True)
+
+                if chunk.reasoning_content:
+                    print(f"{chunk.reasoning_content}", end="", flush=True)
+
+                for tool_call in chunk.tool_calls:
+                    tool_type = get_tool_call_type(tool_call)
+                    print(f"TOOL TYPE: {tool_type}\n")
+                    if tool_type == "client_side_tool":
+                        client_side_tool_calls.append(tool_call)
+                        print(f"Client Tool: {tool_call.function.name}\n")
+                    else:
+                        print(f"[Server tool: {tool_call.function.name}]\n")
+
+                # Add the response to conversation history
+            chat.append(response)
+            
+            # If no client-side tools were called, we're done
+            print(f"CLIENT SIDE TOOL CALLS: {client_side_tool_calls}")
+            if not client_side_tool_calls:
+                break
+            
+            # Execute your custom tools and add results
+            for tool_call in client_side_tool_calls:
+                print(f"\n[Calling: {tool_call.function.name}]\n")
+                if tool_call.function.name in custom_tools_names:
+                    result = tool_registry.execute(tool_call.function.name, json.loads(tool_call.function.arguments))
+                    chat.append(tool_result(result))
+                else:
+                    print(f"UNKNOWN CUSTOM TOOL: {tool_call.function.name}\n")
+                    continue
+        
+        print(f"Number of messages: {len(chat.messages)}")
+        for i, msg in enumerate(chat.messages):
+            print(f"[{i}] Role: {msg.role}, No Tool Calls: {len(msg.tool_calls)}, Tool Used: {msg.tool_calls}")
+
+        return {
+            "content": response.content,
+            "role": "assistant",
+            "model": self.model,
+            "sources": response.citations,
+            "usage": response.usage,
+            "server_side_tool_usage": response.server_side_tool_usage,
+            "created_at": datetime.now()
+        }
+
     def _parse_response(self, response) -> Dict[str, Any]:
         """
         Parse xAI SDK response into a clean dictionary.
@@ -221,6 +488,12 @@ class GrokClient:
         except Exception as e:
             print(f"⚠️  Could not extract usage stats: {e}")
             usage = {}
+
+        try:
+            server_side_tool_usage = response.server_side_tool_usage
+        except Exception as e:
+            print(f"⚠️  Could not extract server side usage stats: {e}")
+            server_side_tool_usage = {}
         
         return {
             "content": content,
@@ -228,6 +501,7 @@ class GrokClient:
             "model": self.model,
             "sources": sources,
             "usage": usage,
+            "server_side_tool_usage": server_side_tool_usage,
             "created_at": datetime.now()
         }
     

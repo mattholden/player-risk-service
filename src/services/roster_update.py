@@ -19,6 +19,7 @@ from database import session_scope
 from database.models.team import Team
 from src.services.roster_sync import RosterSyncService
 from src.services.transfermarkt_scraper import TransfermarktScraper, ScraperConfig
+from src.services.team_lookup import TeamLookupService
 
 
 @dataclass
@@ -117,6 +118,7 @@ class RosterUpdateService:
         """
         self.scraper = TransfermarktScraper(config=scraper_config)
         self.sync_service = RosterSyncService()
+        self.team_lookup_service = TeamLookupService()
     
     def get_active_teams(self) -> List[Team]:
         """
@@ -309,6 +311,71 @@ class RosterUpdateService:
         print(f"{'='*60}")
         
         return batch_result
+    
+    async def update_fixture_rosters(
+        self,
+        fixture: str,
+        league: str = "Premier League"
+    ) -> list[UpdateResult]:
+        """
+        Update rosters for both teams in a fixture.
+        
+        Parses the fixture string to extract team names, then updates
+        each team's roster. If a team is not in the registry, attempts
+        to look it up on Transfermarkt and add it first.
+        
+        Args:
+            fixture: Fixture string (e.g., "Arsenal vs Brentford")
+            league: League name for team lookup (default: "Premier League")
+            
+        Returns:
+            List of UpdateResult for each team (0-2 results depending on success)
+        """
+        results = []
+        
+        # Parse fixture into team names
+        if " vs " not in fixture:
+            print(f"⚠️  Invalid fixture format: {fixture}")
+            return results
+        
+        teams = [t.strip() for t in fixture.split(" vs ")]
+        
+        for team_name in teams:
+            try:
+                # First, try to update the team
+                result = await self.update_team_by_name(team_name, league)
+                
+                # If team not found in registry, try to add it
+                if not result.success and "not found in registry" in (result.error or ""):
+                    print(f"   🔍 Attempting to add {team_name} to registry...")
+                    added_team = await self.team_lookup_service.lookup_and_add(
+                        team_name, league
+                    )
+                    
+                    if added_team:
+                        # Retry the update now that team is in registry
+                        result = await self.update_team_by_name(team_name, league)
+                    else:
+                        print(f"   ⚠️  Could not find {team_name} on Transfermarkt")
+                
+                results.append(result)
+                
+                if result.success:
+                    print(f"   ✅ {team_name}: +{len(result.players_added)} added, "
+                          f"-{len(result.players_removed)} removed")
+                else:
+                    print(f"   ⚠️  {team_name}: {result.error} (continuing anyway)")
+                    
+            except Exception as e:
+                print(f"   ❌ {team_name}: {e} (continuing anyway)")
+                results.append(UpdateResult(
+                    team_name=team_name,
+                    league=league,
+                    success=False,
+                    error=str(e)
+                ))
+        
+        return results
     
     async def update_league(self, league: str) -> BatchUpdateResult:
         """

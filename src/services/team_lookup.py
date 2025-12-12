@@ -242,13 +242,27 @@ class TeamLookupService:
     
     def _fuzzy_match(self, search: str, found: str) -> bool:
         """Check if the found name matches the search term."""
-        # Simple matching - check if search terms are in found name
-        search_words = search.lower().split()
-        found_lower = found.lower()
+        search_lower = search.lower().strip()
+        found_lower = found.lower().strip()
         
-        # All search words should be in the found name
+        # Exact match
+        if search_lower == found_lower:
+            return True
+        
+        # Check if search is contained in found (e.g., "Arsenal" in "Arsenal FC")
+        if search_lower in found_lower:
+            return True
+        
+        # Check if found is contained in search (e.g., "Arsenal" in "Arsenal Football Club")
+        if found_lower in search_lower:
+            return True
+        
+        # Check if all search words are in found name (stricter than before)
+        search_words = search_lower.split()
         matches = sum(1 for word in search_words if word in found_lower)
-        return matches >= len(search_words) * 0.5  # At least 50% of words match
+        
+        # Require ALL words to match for multi-word searches
+        return matches == len(search_words)
     
     def _check_league_match(self, target_league: str, found_text: str) -> bool:
         """Check if the found text contains league indicators."""

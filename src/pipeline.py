@@ -14,13 +14,16 @@ Usage:
     make pipeline-fixtures
 """
 
+import asyncio
 from datetime import datetime
 from typing import Optional
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # noqa: E402
 load_dotenv()
 
-from bigquery import ProjectionsService
+from bigquery import ProjectionsService  # noqa: E402
+from src.services.roster_update import RosterUpdateService  # noqa: E402
+from src.services.agent_pipeline import AgentPipeline  # noqa: E402
 
 
 class ProjectionAlertPipeline:
@@ -40,10 +43,8 @@ class ProjectionAlertPipeline:
         """
         self.dry_run = dry_run
         self.projections_service = ProjectionsService()
-        
-        # Will be initialized as needed
-        self._agent_pipeline = None
-        self._roster_sync = None
+        self.roster_update_service = RosterUpdateService()
+        self.agent_pipeline = AgentPipeline()
     
     # =========================================================================
     # Step 1: Fetch Fixtures
@@ -73,12 +74,15 @@ class ProjectionAlertPipeline:
         return fixtures
     
     # =========================================================================
-    # Step 2-3: Update Rosters (placeholder for now)
+    # Step 2-3: Update Rosters
     # =========================================================================
     
-    def update_rosters_for_fixture(self, fixture: str) -> bool:
+    async def update_rosters_for_fixture(self, fixture: str) -> bool:
         """
         Update rosters for both teams in a fixture.
+        
+        Failures are logged but don't stop the pipeline - the agent has
+        contingencies to find roster info from online sources.
         
         Args:
             fixture: Fixture string (e.g., "Arsenal vs Brentford")
@@ -86,13 +90,16 @@ class ProjectionAlertPipeline:
         Returns:
             bool: True if at least one roster was updated successfully
         """
-        # TODO: Implement in next iteration
         print(f"\n🔄 Updating rosters for: {fixture}")
-        print("   ⏭️  [Not yet implemented - will add in Step 2-3]")
-        return True
+        
+        results = await self.roster_update_service.update_fixture_rosters(fixture)
+        
+        # Return True if at least one team updated successfully
+        successes = sum(1 for r in results if r.success)
+        return successes > 0
     
     # =========================================================================
-    # Step 4-5: Run Agent Pipeline (placeholder for now)
+    # Step 4-5: Run Agent Pipeline
     # =========================================================================
     
     def run_agents_for_fixture(self, fixture: str, match_time: str) -> list:
@@ -100,16 +107,41 @@ class ProjectionAlertPipeline:
         Run the agentic pipeline for a fixture and save alerts.
         
         Args:
-            fixture: Fixture string
-            match_time: Match time string
+            fixture: Fixture string (e.g., "Arsenal vs Brentford")
+            match_time: Match time string (e.g., "2025-12-06")
             
         Returns:
-            list: Generated alerts
+            list: Generated PlayerAlert objects
         """
-        # TODO: Implement in next iteration
         print(f"\n🤖 Running agents for: {fixture}")
-        print("   ⏭️  [Not yet implemented - will add in Step 4-5]")
-        return []
+        
+        # Parse match_time string to datetime
+        try:
+            # Handle various date formats
+            if "T" in match_time:
+                fixture_date = datetime.fromisoformat(match_time)
+            elif " " in match_time:
+                fixture_date = datetime.strptime(match_time, "%Y-%m-%d %H:%M:%S")
+            else:
+                # Date only - default to noon
+                fixture_date = datetime.strptime(match_time, "%Y-%m-%d")
+                fixture_date = fixture_date.replace(hour=12, minute=0)
+        except ValueError as e:
+            print(f"   ⚠️  Could not parse match_time '{match_time}': {e}")
+            fixture_date = datetime.now()
+        
+        # Run the agent pipeline
+        if self.dry_run:
+            print("   🔒 Dry run - skipping agent execution")
+            return []
+        
+        try:
+            alerts = self.agent_pipeline.run_and_save(fixture, fixture_date)
+            print(f"   ✅ Generated {len(alerts)} alerts")
+            return alerts
+        except Exception as e:
+            print(f"   ❌ Agent pipeline failed: {e}")
+            return []
     
     # =========================================================================
     # Step 6-7: Enrich and Push (placeholder for now)
@@ -127,9 +159,9 @@ class ProjectionAlertPipeline:
     # Main Run Method
     # =========================================================================
     
-    def run(self, fixtures: Optional[list[dict]] = None) -> None:
+    async def run_async(self, fixtures: Optional[list[dict]] = None) -> None:
         """
-        Execute the full pipeline.
+        Execute the full pipeline (async version).
         
         Args:
             fixtures: Optional list of fixtures to process. If not provided,
@@ -167,7 +199,7 @@ class ProjectionAlertPipeline:
             print(f"{'─'*60}")
             
             # Step 2-3: Update rosters
-            self.update_rosters_for_fixture(fixture)
+            await self.update_rosters_for_fixture(fixture)
             
             # Step 4-5: Run agents
             alerts = self.run_agents_for_fixture(fixture, match_time)
@@ -194,6 +226,16 @@ class ProjectionAlertPipeline:
         print(f"   Alerts generated: {len(all_alerts)}")
         print(f"   Duration: {duration:.1f} seconds")
         print(f"   Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    def run(self, fixtures: Optional[list[dict]] = None) -> None:
+        """
+        Execute the full pipeline (sync wrapper).
+        
+        Args:
+            fixtures: Optional list of fixtures to process. If not provided,
+                     fetches from BigQuery.
+        """
+        asyncio.run(self.run_async(fixtures))
 
 
 def main():

@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-alert-save
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -26,7 +26,7 @@ help:
 	@echo "  make test-research  - Test Research Agent"
 	@echo "  make test-analyst   - Test Analyst Agent"
 	@echo "  make test-shark     - Test Shark Agent"
-	@echo "  make test-alert-save - Test Alert database save"
+	@echo "  make test-alert-save - Test AlertService (save & query)"
 	@echo "  make test-roster-sync - Test Roster sync service"
 	@echo ""
 	@echo "Pipeline:"
@@ -36,6 +36,12 @@ help:
 	@echo ""
 	@echo "BigQuery:"
 	@echo "  make test-bigquery     - Test BigQuery integration"
+	@echo ""
+	@echo "Pipeline Testing:"
+	@echo "  make test-pipeline         - Test full pipeline flow"
+	@echo "  make test-pipeline-step1   - Test fixture fetch only"
+	@echo "  make test-pipeline-step2 FIXTURE='Team A vs Team B' - Test roster update"
+	@echo "  make test-pipeline-step4 FIXTURE='Team A vs Team B' - Test agent pipeline"
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -92,6 +98,18 @@ pipeline-fixtures:
 
 test-bigquery:
 	python -m scripts.test_bigquery
+
+test-pipeline:
+	python -m scripts.test_pipeline
+
+test-pipeline-step1:
+	python -m scripts.test_pipeline --step 1
+
+test-pipeline-step2:
+	python -m scripts.test_pipeline --step 2 --fixture "$(FIXTURE)"
+
+test-pipeline-step4:
+	python -m scripts.test_pipeline --step 4 --fixture "$(FIXTURE)"
 
 test-roster-sync:
 	python -m src.services.roster_sync

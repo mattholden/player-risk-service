@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-alert-save
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -42,6 +42,8 @@ help:
 	@echo "  make test-pipeline-step1   - Test fixture fetch only"
 	@echo "  make test-pipeline-step2 FIXTURE='Team A vs Team B' - Test roster update"
 	@echo "  make test-pipeline-step4 FIXTURE='Team A vs Team B' - Test agent pipeline"
+	@echo "  make test-pipeline-step6 FIXTURE='Team A vs Team B' - Test BigQuery enrichment"
+	@echo "  make test-pipeline-step6-dry FIXTURE='Team A vs Team B' - Test enrichment (dry run)"
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -110,6 +112,12 @@ test-pipeline-step2:
 
 test-pipeline-step4:
 	python -m scripts.test_pipeline --step 4 --fixture "$(FIXTURE)"
+
+test-pipeline-step6:
+	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)"
+
+test-pipeline-step6-dry:
+	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)" --dry-run
 
 test-roster-sync:
 	python -m src.services.roster_sync

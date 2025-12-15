@@ -24,6 +24,7 @@ load_dotenv()
 from bigquery import ProjectionsService  # noqa: E402
 from src.services.roster_update import RosterUpdateService  # noqa: E402
 from src.services.agent_pipeline import AgentPipeline  # noqa: E402
+from database.services import AlertService  # noqa: E402
 
 
 class ProjectionAlertPipeline:
@@ -45,6 +46,7 @@ class ProjectionAlertPipeline:
         self.projections_service = ProjectionsService()
         self.roster_update_service = RosterUpdateService()
         self.agent_pipeline = AgentPipeline()
+        self.alert_service = AlertService()
     
     # =========================================================================
     # Step 1: Fetch Fixtures
@@ -144,16 +146,62 @@ class ProjectionAlertPipeline:
             return []
     
     # =========================================================================
-    # Step 6-7: Enrich and Push (placeholder for now)
+    # Step 6-7: Enrich and Push
     # =========================================================================
     
-    def enrich_and_push_projections(self) -> None:
+    def enrich_and_push_projections(
+        self,
+        fixtures: list[str],
+        push_all: bool = True
+    ) -> int:
         """
         Pull projections, match with alerts, and push enriched data.
+        
+        Args:
+            fixtures: List of fixture strings to process
+            push_all: If True, push all projections (default); if False, only those with alerts
+            
+        Returns:
+            int: Number of enriched rows pushed to BigQuery
         """
-        # TODO: Implement in next iteration
-        print("\n📤 Enriching projections and pushing to BigQuery")
-        print("   ⏭️  [Not yet implemented - will add in Step 6-7]")
+        print("\n📊 Step 6-7: Enriching projections with alerts")
+        
+        if not fixtures:
+            print("   ⚠️  No fixtures to process")
+            return 0
+        
+        # Step 6a: Query alerts from database (latest per player/fixture only)
+        print(f"\n🔍 Fetching latest alerts for {len(fixtures)} fixtures...")
+        db_alerts = self.alert_service.get_latest_alerts_for_fixtures(fixtures)
+        
+        if not db_alerts:
+            print("   ℹ️  No alerts found in database - all players appear healthy")
+        else:
+            print(f"   Found {len(db_alerts)} alerts in database")
+        
+        # Step 6b: Pull projections from BigQuery
+        projections = self.projections_service.get_all_projections_for_fixtures(fixtures)
+        
+        if projections.empty:
+            print("   ❌ No projections found in BigQuery for these fixtures")
+            return 0
+        
+        # Step 6c: Enrich projections with alerts
+        # Note: db_alerts have the same fields as PlayerAlert, so duck typing works
+        enriched = self.projections_service.enrich_with_alerts(projections, db_alerts)
+        
+        # Step 6d: Filter to only alerted projections (unless push_all)
+        if not push_all:
+            enriched = self.projections_service.filter_alerted_projections(enriched)
+        
+        if enriched.empty:
+            print("   ⚠️  No enriched projections to push")
+            return 0
+        
+        # Step 7: Push to BigQuery
+        self.projections_service.push_enriched_projections(enriched)
+        
+        return len(enriched)
     
     # =========================================================================
     # Main Run Method
@@ -210,8 +258,11 @@ class ProjectionAlertPipeline:
         print("📊 ENRICHMENT & EXPORT")
         print("="*60)
         
+        enriched_count = 0
         if not self.dry_run:
-            self.enrich_and_push_projections()
+            # Extract fixture names for enrichment
+            fixture_names = [f['fixture'] for f in fixtures]
+            enriched_count = self.enrich_and_push_projections(fixture_names)
         else:
             print("\n🔒 Dry run - skipping BigQuery write")
         
@@ -224,6 +275,7 @@ class ProjectionAlertPipeline:
         print("="*60)
         print(f"   Fixtures processed: {len(fixtures)}")
         print(f"   Alerts generated: {len(all_alerts)}")
+        print(f"   Projections enriched: {enriched_count}")
         print(f"   Duration: {duration:.1f} seconds")
         print(f"   Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
     

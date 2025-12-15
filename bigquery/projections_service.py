@@ -9,14 +9,17 @@ This service handles:
 """
 
 import os
-from typing import Optional
+from typing import Optional, Union, List
 from datetime import datetime
 import pandas as pd
 
 from bigquery.client import BigQueryClient
 from src.utils.matching import PlayerMatcher
 from src.agents.models import PlayerAlert
-from database.enums import AlertLevel
+from database.models.alert import Alert
+
+# Type alias for alert objects - accepts either pydantic model or database model
+AlertLike = Union[PlayerAlert, Alert]
 
 
 class ProjectionsService:
@@ -184,7 +187,7 @@ class ProjectionsService:
     def enrich_with_alerts(
         self,
         projections: pd.DataFrame,
-        alerts: list[PlayerAlert],
+        alerts: List[AlertLike],
         player_name_column: str = "player_name",
         fixture_column: str = "fixture"
     ) -> pd.DataFrame:
@@ -196,7 +199,7 @@ class ProjectionsService:
         
         Args:
             projections: DataFrame of projections from BigQuery
-            alerts: List of PlayerAlert objects from the pipeline
+            alerts: List of alert objects (PlayerAlert or database Alert)
             player_name_column: Column name for player names in projections
             fixture_column: Column name for fixture in projections
             
@@ -208,9 +211,9 @@ class ProjectionsService:
             return projections
         
         if not alerts:
-            print("⚠️ No alerts to match - returning projections with empty alert columns")
+            print("⚠️ No alerts to match - returning projections with null alert columns")
             projections = projections.copy()
-            projections["alert_level"] = AlertLevel.NO_ALERT.value
+            projections["alert_level"] = None
             projections["alert_description"] = None
             return projections
         
@@ -219,8 +222,8 @@ class ProjectionsService:
         # Create a copy to avoid modifying original
         enriched = projections.copy()
         
-        # Initialize alert columns
-        enriched["alert_level"] = AlertLevel.NO_ALERT.value
+        # Initialize alert columns with null (no alert = healthy player)
+        enriched["alert_level"] = None
         enriched["alert_description"] = None
         enriched["alert_matched"] = False
         
@@ -265,7 +268,7 @@ class ProjectionsService:
         
         Args:
             enriched_projections: DataFrame with alert columns
-            include_no_alert: If True, include rows with NO_ALERT level
+            include_no_alert: If True, include rows with null alert_level
             
         Returns:
             pd.DataFrame: Filtered projections
@@ -273,9 +276,9 @@ class ProjectionsService:
         if include_no_alert:
             return enriched_projections
         
-        # Filter to only matched alerts (excluding NO_ALERT)
+        # Filter to only matched alerts (excluding null/None)
         filtered = enriched_projections[
-            enriched_projections["alert_level"] != AlertLevel.NO_ALERT.value
+            enriched_projections["alert_level"].notna()
         ]
         
         print(f"   Filtered to {len(filtered)} projections with active alerts")
@@ -317,7 +320,7 @@ class ProjectionsService:
     
     def run_enrichment_pipeline(
         self,
-        alerts: list[PlayerAlert],
+        alerts: List[AlertLike],
         fixtures: Optional[list[str]] = None,
         player_name_column: str = "player_name",
         fixture_column: str = "fixture",
@@ -334,7 +337,7 @@ class ProjectionsService:
         4. Pushes to destination table
         
         Args:
-            alerts: List of PlayerAlert objects from the pipeline
+            alerts: List of alert objects (PlayerAlert or database Alert)
             fixtures: Optional list of fixtures to filter (infers from alerts if not provided)
             player_name_column: Column name for player names
             fixture_column: Column name for fixture

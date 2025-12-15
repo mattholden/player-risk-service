@@ -109,6 +109,50 @@ class AlertService:
             
             return [self._detach_alert(a) for a in alerts]
     
+    def get_latest_alerts_for_fixtures(self, fixtures: List[str]) -> List[Alert]:
+        """
+        Get the most recent alert for each player/fixture combination.
+        
+        This is useful for enrichment pipelines that run multiple times
+        and should only use the latest assessment for each player.
+        
+        Args:
+            fixtures: List of fixture strings
+            
+        Returns:
+            List of Alert objects (one per unique player/fixture)
+        """
+        if not fixtures:
+            return []
+        
+        with session_scope() as session:
+            from sqlalchemy import func
+            
+            # Subquery to get the max created_at for each player/fixture
+            latest_subquery = session.query(
+                Alert.player_name,
+                Alert.fixture,
+                func.max(Alert.created_at).label('max_created')
+            ).filter(
+                Alert.fixture.in_(fixtures),
+                Alert.active_projection.is_(True)
+            ).group_by(
+                Alert.player_name,
+                Alert.fixture
+            ).subquery()
+            
+            # Join to get the full alert records
+            alerts = session.query(Alert).join(
+                latest_subquery,
+                (Alert.player_name == latest_subquery.c.player_name) &
+                (Alert.fixture == latest_subquery.c.fixture) &
+                (Alert.created_at == latest_subquery.c.max_created)
+            ).filter(
+                Alert.active_projection.is_(True)
+            ).all()
+            
+            return [self._detach_alert(a) for a in alerts]
+    
     def get_active_alerts(self) -> List[Alert]:
         """
         Get all active alerts (where active_projection is True).

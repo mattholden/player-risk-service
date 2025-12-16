@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -33,6 +33,12 @@ help:
 	@echo "  make pipeline          - Run full projection alert pipeline"
 	@echo "  make pipeline-dry-run  - Run pipeline without writing to DB/BigQuery"
 	@echo "  make pipeline-fixtures - Fetch and display fixtures only"
+	@echo ""
+	@echo "Roster Preparation:"
+	@echo "  make prepare-rosters           - Full preparation (all leagues)"
+	@echo "  make prepare-rosters-epl       - Premier League only"
+	@echo "  make prepare-rosters-teams     - Only register missing teams"
+	@echo "  make prepare-rosters-league LEAGUE='La Liga' - Specific league"
 	@echo ""
 	@echo "BigQuery:"
 	@echo "  make test-bigquery     - Test BigQuery integration"
@@ -97,6 +103,21 @@ pipeline-dry-run:
 
 pipeline-fixtures:
 	python -m src.pipeline --fixtures-only
+
+prepare-rosters:
+	python -m src.services.roster_preparation
+
+prepare-rosters-teams:
+	python -m src.services.roster_preparation --teams-only
+
+prepare-rosters-no-verify:
+	python -m src.services.roster_preparation --skip-verify
+
+prepare-rosters-epl:
+	python -m src.services.roster_preparation --league "Premier League"
+
+prepare-rosters-league:
+	python -m src.services.roster_preparation --league "$(LEAGUE)"
 
 test-bigquery:
 	python -m scripts.test_bigquery

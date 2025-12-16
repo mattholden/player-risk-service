@@ -23,6 +23,7 @@ Usage:
 
 import asyncio
 import re
+import webbrowser
 from dataclasses import dataclass
 from typing import Optional, List
 from urllib.parse import quote
@@ -274,6 +275,40 @@ class TeamLookupService:
         
         return any(ident in found_lower for ident in identifiers)
     
+    def verify_team_in_browser(self, result: TeamLookupResult) -> bool:
+        """
+        Open the team's Transfermarkt page in a browser for user verification.
+        
+        Args:
+            result: TeamLookupResult to verify
+            
+        Returns:
+            True if user confirms, False otherwise
+        """
+        print("\n" + "=" * 60)
+        print("🔍 TEAM VERIFICATION")
+        print("=" * 60)
+        print(f"\n   Team:   {result.team_name}")
+        print(f"   League: {result.league}")
+        print(f"   Country: {result.country}")
+        print(f"   TM ID:  {result.transfermarkt_id}")
+        print(f"\n   URL: {result.transfermarkt_url}")
+        
+        print("\n📂 Opening browser for verification...")
+        webbrowser.open(result.transfermarkt_url)
+        
+        print("\n" + "-" * 60)
+        while True:
+            response = input("Is this the correct team roster? (yes/no): ").strip().lower()
+            if response in ('yes', 'y'):
+                print("   ✅ Team verified!")
+                return True
+            elif response in ('no', 'n'):
+                print("   ❌ Team rejected - not saving to database")
+                return False
+            else:
+                print("   Please enter 'yes' or 'no'")
+    
     def add_team_to_database(self, result: TeamLookupResult) -> Optional[Team]:
         """
         Add a looked-up team to the database.
@@ -330,7 +365,8 @@ class TeamLookupService:
         team_name: str, 
         league: str,
         country: Optional[str] = None,
-        headless: bool = True
+        headless: bool = True,
+        verify: bool = True
     ) -> Optional[Team]:
         """
         Convenience method to lookup a team and add it to the database.
@@ -340,6 +376,7 @@ class TeamLookupService:
             league: League name
             country: Country (optional)
             headless: Run browser headless
+            verify: If True, open browser for user verification before saving
             
         Returns:
             Team object if successful, None otherwise
@@ -347,6 +384,11 @@ class TeamLookupService:
         result = await self.lookup_team(team_name, league, country, headless)
         
         if result:
+            # Verify with user if requested
+            if verify:
+                if not self.verify_team_in_browser(result):
+                    return None
+            
             return self.add_team_to_database(result)
         
         return None
@@ -362,11 +404,17 @@ async def main():
     
     # Parse arguments
     if len(sys.argv) < 3:
-        print("\nUsage: python -m src.services.team_lookup <team_name> <league> [--save]")
+        print("\nUsage: python -m src.services.team_lookup <team_name> <league> [--save] [--no-verify]")
+        print("\nOptions:")
+        print("  --save       Save team to database after lookup")
+        print("  --no-verify  Skip browser verification (use with caution)")
         print("\nExamples:")
         print('  python -m src.services.team_lookup "Manchester City" "Premier League"')
         print('  python -m src.services.team_lookup "Barcelona" "La Liga" --save')
         print('  python -m src.services.team_lookup "Bayern Munich" "Bundesliga" --save')
+        print("\nOr use make commands:")
+        print('  make team-lookup TEAM="Manchester City" LEAGUE="Premier League"')
+        print('  make team-add TEAM="Barcelona" LEAGUE="La Liga"')
         print("\nSupported leagues:")
         print("  - Premier League, Championship (England)")
         print("  - La Liga (Spain)")
@@ -380,21 +428,24 @@ async def main():
     team_name = sys.argv[1]
     league = sys.argv[2]
     save_to_db = "--save" in sys.argv
+    skip_verify = "--no-verify" in sys.argv
     
     service = TeamLookupService()
     
     if save_to_db:
-        print(f"\n📥 Looking up and saving: {team_name} ({league})")
-        team = await service.lookup_and_add(team_name, league)
+        print(f"\n📥 Looking up: {team_name} ({league})")
+        team = await service.lookup_and_add(team_name, league, verify=not skip_verify)
         if team:
-            print(f"\n✅ Team ready for roster scraping!")
+            print(f"\n✅ Team saved and ready for roster scraping!")
             print(f"   Run: make test-roster-update")
+        else:
+            print(f"\n❌ Team not saved to database")
     else:
         print(f"\n🔍 Looking up: {team_name} ({league})")
         result = await service.lookup_team(team_name, league)
         if result:
             print(f"\n📋 To add this team to the database, run:")
-            print(f'   python -m src.services.team_lookup "{team_name}" "{league}" --save')
+            print(f'   make team-add TEAM="{team_name}" LEAGUE="{league}"')
 
 
 if __name__ == "__main__":

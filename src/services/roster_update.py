@@ -19,7 +19,6 @@ from database import session_scope
 from database.models.team import Team
 from src.services.roster_sync import RosterSyncService
 from src.services.transfermarkt_scraper import TransfermarktScraper, ScraperConfig
-from src.services.team_lookup import TeamLookupService
 
 
 @dataclass
@@ -118,7 +117,6 @@ class RosterUpdateService:
         """
         self.scraper = TransfermarktScraper(config=scraper_config)
         self.sync_service = RosterSyncService()
-        self.team_lookup_service = TeamLookupService()
     
     def get_active_teams(self) -> List[Team]:
         """
@@ -344,20 +342,6 @@ class RosterUpdateService:
             try:
                 # First, try to update the team
                 result = await self.update_team_by_name(team_name, league)
-                
-                # If team not found in registry, try to add it
-                if not result.success and "not found in registry" in (result.error or ""):
-                    print(f"   🔍 Attempting to add {team_name} to registry...")
-                    added_team = await self.team_lookup_service.lookup_and_add(
-                        team_name, league
-                    )
-                    
-                    if added_team:
-                        # Retry the update now that team is in registry
-                        result = await self.update_team_by_name(team_name, league)
-                    else:
-                        print(f"   ⚠️  Could not find {team_name} on Transfermarkt")
-                
                 results.append(result)
                 
                 if result.success:

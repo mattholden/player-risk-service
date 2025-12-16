@@ -73,29 +73,32 @@ class ProjectionsService:
     def get_upcoming_fixtures(
         self,
         fixture_column: str = "fixture",
-        match_time_column: str = "match_time"
+        match_time_column: str = "match_time",
+        league_column: str = "season_name"
     ) -> list[dict]:
         """
         Get distinct upcoming fixtures from the projections table.
         
-        Returns fixtures with their match times, useful for determining
+        Returns fixtures with their match times and leagues, useful for determining
         which fixtures to process through the agent pipeline.
         
         Args:
             fixture_column: Column name for fixture in source table
             match_time_column: Column name for match time in source table
+            league_column: Column name for league/season in source table
             
         Returns:
-            list[dict]: List of fixtures with keys 'fixture' and 'match_time'
+            list[dict]: List of fixtures with keys 'fixture', 'match_time', 'league'
                 Example: [
-                    {'fixture': 'Arsenal vs Brentford', 'match_time': '2025-12-03 19:45:00'},
-                    {'fixture': 'Liverpool vs Brighton', 'match_time': '2025-12-04 20:00:00'}
+                    {'fixture': 'Arsenal vs Brentford', 'match_time': '2025-12-03 19:45:00', 'league': 'Premier League'},
+                    {'fixture': 'Liverpool vs Brighton', 'match_time': '2025-12-04 20:00:00', 'league': 'Premier League'}
                 ]
         """
         query = f"""
             SELECT DISTINCT 
                 {fixture_column} as fixture,
-                {match_time_column} as match_time
+                {match_time_column} as match_time,
+                {league_column} as league
             FROM `{self.source_table_id}`
             ORDER BY {match_time_column}
         """

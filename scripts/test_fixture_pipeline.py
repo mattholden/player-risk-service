@@ -36,9 +36,9 @@ from database.services import AlertService
 
 
 async def list_fixtures(league_filter: str = None):
-    """List all available fixtures from BigQuery."""
+    """List all available fixtures from BigQuery (upcoming only)."""
     print("\n" + "=" * 80)
-    print("📋 AVAILABLE FIXTURES")
+    print("📋 AVAILABLE FIXTURES (Upcoming Only)")
     if league_filter:
         print(f"   (Filtered to: {league_filter})")
     print("=" * 80)
@@ -52,6 +52,49 @@ async def list_fixtures(league_filter: str = None):
         if not all_fixtures:
             print("\n⚠️  No fixtures found in BigQuery")
             return []
+        
+        # Filter out past fixtures
+        now = datetime.now()
+        original_count = len(all_fixtures)
+        fixtures = []
+        skipped_fixtures = []
+        
+        for f in all_fixtures:
+            match_time = f.get('match_time')
+            # Handle different match_time formats
+            if match_time:
+                if isinstance(match_time, datetime):
+                    fixture_date = match_time
+                elif isinstance(match_time, str):
+                    try:
+                        if "T" in match_time:
+                            fixture_date = datetime.fromisoformat(match_time.replace('Z', '+00:00'))
+                        else:
+                            fixture_date = datetime.strptime(match_time[:10], "%Y-%m-%d")
+                    except ValueError:
+                        fixture_date = now  # Include if can't parse
+                else:
+                    # Try to convert date to datetime
+                    try:
+                        fixture_date = datetime.combine(match_time, datetime.min.time())
+                    except:
+                        fixture_date = now
+                
+                if fixture_date >= now:
+                    fixtures.append(f)
+                else:
+                    skipped_fixtures.append(f)
+            else:
+                fixtures.append(f)  # Include if no match_time
+        
+        if skipped_fixtures:
+            print(f"\n⏭️  Skipped {len(skipped_fixtures)} past fixture(s):")
+            for skipped in skipped_fixtures[:5]:  # Show first 5
+                print(f"   - {skipped['fixture']} ({skipped.get('match_time', 'Unknown')})")
+            if len(skipped_fixtures) > 5:
+                print(f"   ... and {len(skipped_fixtures) - 5} more")
+        
+        all_fixtures = fixtures
         
         # Apply league filter if provided
         if league_filter:
@@ -71,7 +114,7 @@ async def list_fixtures(league_filter: str = None):
         else:
             fixtures = all_fixtures
         
-        print(f"\nFound {len(fixtures)} fixture(s):\n")
+        print(f"\nFound {len(fixtures)} upcoming fixture(s):\n")
         
         for i, fixture_data in enumerate(fixtures):
             fixture_name = fixture_data['fixture']
@@ -293,6 +336,31 @@ async def main():
         client = BigQueryClient()
         service = ProjectionsService(client)
         all_fixtures = service.get_upcoming_fixtures()
+        
+        # Filter out past fixtures
+        now = datetime.now()
+        filtered = []
+        for f in all_fixtures:
+            match_time = f.get('match_time')
+            if match_time:
+                if isinstance(match_time, datetime):
+                    fixture_date = match_time
+                elif isinstance(match_time, str):
+                    try:
+                        fixture_date = datetime.strptime(match_time[:10], "%Y-%m-%d")
+                    except ValueError:
+                        fixture_date = now
+                else:
+                    try:
+                        fixture_date = datetime.combine(match_time, datetime.min.time())
+                    except:
+                        fixture_date = now
+                
+                if fixture_date >= now:
+                    filtered.append(f)
+            else:
+                filtered.append(f)
+        all_fixtures = filtered
         
         # Apply league filter if provided
         if args.league:

@@ -284,7 +284,7 @@ LOW ALERT - Worth monitoring:
 - Consider both direct impacts (injured players) and indirect (beneficiaries)
 - Always use full names of players, not nicknames or abbreviations
 - Be selective - return only actionable opportunities, not every affected player
-- One sentence explanations must be specific and actionable
+- One sentence explanations must be specific and actionable while using the full names of the players.
 - If a player appears in analyses for both teams, consolidate into ONE comprehensive alert
 
 **Output Format:**

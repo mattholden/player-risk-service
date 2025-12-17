@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline test-roster-sync test-transfermarkt test-roster-update test-custom-tool
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -26,11 +26,40 @@ help:
 	@echo "  make test-research  - Test Research Agent"
 	@echo "  make test-analyst   - Test Analyst Agent"
 	@echo "  make test-shark     - Test Shark Agent"
-	@echo "  make test-alert-save - Test Alert database save"
+	@echo "  make test-alert-save - Test AlertService (save & query)"
 	@echo "  make test-roster-sync - Test Roster sync service"
 	@echo ""
 	@echo "Pipeline:"
-	@echo "  make pipeline       - Run full agent pipeline"
+	@echo "  make pipeline          - Run full projection alert pipeline"
+	@echo "  make pipeline-dry-run  - Run pipeline without writing to DB/BigQuery"
+	@echo "  make pipeline-fixtures - Fetch and display fixtures only"
+	@echo ""
+	@echo "Roster Preparation:"
+	@echo "  make prepare-rosters           - Full preparation (all leagues)"
+	@echo "  make prepare-rosters-epl       - Premier League only"
+	@echo "  make prepare-rosters-teams     - Only register missing teams"
+	@echo "  make prepare-rosters-league LEAGUE='La Liga' - Specific league"
+	@echo ""
+	@echo "BigQuery:"
+	@echo "  make test-bigquery     - Test BigQuery integration"
+	@echo ""
+	@echo "Pipeline Testing:"
+	@echo "  make test-pipeline         - Test full pipeline flow"
+	@echo "  make test-pipeline-step1   - Test fixture fetch only"
+	@echo "  make test-pipeline-step2 FIXTURE='Team A vs Team B' - Test roster update"
+	@echo "  make test-pipeline-step4 FIXTURE='Team A vs Team B' - Test agent pipeline"
+	@echo ""
+	@echo "Fixture-by-Fixture Pipeline (for troubleshooting):"
+	@echo "  make test-fixture-list                    - List all fixtures"
+	@echo "  make test-fixture-list-epl                - List Premier League fixtures only"
+	@echo "  make test-fixture FIXTURE='Team A vs Team B'  - Run full pipeline for fixture"
+	@echo "  make test-fixture-dry FIXTURE='Team A vs Team B' - Dry run (no BigQuery push)"
+	@echo "  make test-fixture-index INDEX=0           - Run fixture by index"
+	@echo "  make test-fixture-index-dry INDEX=0       - Dry run fixture by index"
+	@echo "  make test-fixture-epl INDEX=0             - Run Premier League fixture by index"
+	@echo "  make test-fixture-epl-dry INDEX=0         - Dry run Premier League fixture"
+	@echo "  make test-pipeline-step6 FIXTURE='Team A vs Team B' - Test BigQuery enrichment"
+	@echo "  make test-pipeline-step6-dry FIXTURE='Team A vs Team B' - Test enrichment (dry run)"
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -77,7 +106,74 @@ test-alert-save:
 	python -m scripts.test_alert_save
 
 pipeline:
-	python -m src.services.agent_pipeline
+	python -m src.pipeline
+
+pipeline-dry-run:
+	python -m src.pipeline --dry-run
+
+pipeline-fixtures:
+	python -m src.pipeline --fixtures-only
+
+prepare-rosters:
+	python -m src.services.roster_preparation
+
+prepare-rosters-teams:
+	python -m src.services.roster_preparation --teams-only
+
+prepare-rosters-no-verify:
+	python -m src.services.roster_preparation --skip-verify
+
+prepare-rosters-epl:
+	python -m src.services.roster_preparation --league "Premier League"
+
+prepare-rosters-league:
+	python -m src.services.roster_preparation --league "$(LEAGUE)"
+
+test-bigquery:
+	python -m scripts.test_bigquery
+
+test-pipeline:
+	python -m scripts.test_pipeline
+
+test-pipeline-step1:
+	python -m scripts.test_pipeline --step 1
+
+test-pipeline-step2:
+	python -m scripts.test_pipeline --step 2 --fixture "$(FIXTURE)"
+
+test-pipeline-step4:
+	python -m scripts.test_pipeline --step 4 --fixture "$(FIXTURE)"
+
+test-pipeline-step6:
+	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)"
+
+test-pipeline-step6-dry:
+	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)" --dry-run
+
+# Full fixture pipeline testing (one fixture at a time)
+test-fixture-list:
+	python -m scripts.test_fixture_pipeline --list
+
+test-fixture-list-epl:
+	python -m scripts.test_fixture_pipeline --list --league "Premier League"
+
+test-fixture:
+	python -m scripts.test_fixture_pipeline --fixture "$(FIXTURE)"
+
+test-fixture-dry:
+	python -m scripts.test_fixture_pipeline --fixture "$(FIXTURE)" --dry-run
+
+test-fixture-index:
+	python -m scripts.test_fixture_pipeline --index $(INDEX)
+
+test-fixture-index-dry:
+	python -m scripts.test_fixture_pipeline --index $(INDEX) --dry-run
+
+test-fixture-epl:
+	python -m scripts.test_fixture_pipeline --index $(INDEX) --league "Premier League"
+
+test-fixture-epl-dry:
+	python -m scripts.test_fixture_pipeline --index $(INDEX) --league "Premier League" --dry-run
 
 test-roster-sync:
 	python -m src.services.roster_sync

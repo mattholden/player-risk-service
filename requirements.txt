@@ -22,3 +22,8 @@ lxml==5.3.0  # Fast HTML parser backend for BeautifulSoup
 # Streamlit Dashboard
 streamlit>=1.40.0  # Updated for compatibility with xai-sdk packaging requirements
 
+# BigQuery Integration
+google-cloud-bigquery>=3.26.0  # BigQuery client (3.26+ uses protobuf 5.x)
+pandas>=2.0.0  # DataFrame support for BigQuery
+pyarrow>=14.0.0  # Required for BigQuery to DataFrame conversion
+db-dtypes>=1.2.0  # BigQuery-specific data types for pandas

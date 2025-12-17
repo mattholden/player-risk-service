@@ -4,7 +4,7 @@ Database package.
 This package contains all database-related code:
 - models: SQLAlchemy ORM models
 - database: Connection management and sessions
-- repositories: Data access layer (future)
+- services: Business logic for database operations
 """
 
 # Import and expose key components
@@ -17,6 +17,7 @@ from database.database import (
     get_session,
     session_scope
 )
+from database.services import AlertService
 
 __all__ = [
     'Base',
@@ -26,6 +27,7 @@ __all__ = [
     'Roster',
     'Team',
     'AlertLevel',
+    'AlertService',
     'DatabaseManager',
     'db_manager',
     'get_session',

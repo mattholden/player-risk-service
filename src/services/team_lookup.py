@@ -23,6 +23,7 @@ Usage:
 
 import asyncio
 import re
+import webbrowser
 from dataclasses import dataclass
 from typing import Optional, List
 from urllib.parse import quote
@@ -122,9 +123,12 @@ class TeamLookupService:
             
             try:
                 # Build search URL
-                search_query = quote(team_name)
+                # Normalize the search query: replace "&" with "and" for better results
+                normalized_team_name = team_name.replace(' & ', ' and ').replace('&', ' and ')
+                search_query = quote(normalized_team_name)
                 url = f"{self.SEARCH_URL}?query={search_query}"
                 
+                print(f"   Search query: {normalized_team_name}")
                 print(f"   URL: {url}")
                 
                 # Navigate to search results
@@ -172,14 +176,32 @@ class TeamLookupService:
         """Parse Transfermarkt search results to find matching teams."""
         results = []
         
-        # Find the clubs section - look for header "Clubs" or similar
-        # The structure is: <div class="box"><h2>Clubs</h2>...</div>
+        # The search results page has multiple tables for different result types
+        # Find the "Clubs" section specifically - it has an id starting with "yw1"
+        # Look for the table with club results
         
-        # Find all result rows - team links typically have this structure:
-        # <a href="/fc-arsenal/startseite/verein/11">Arsenal FC</a>
+        # Strategy 1: Find the "Clubs" header and then the table below it
+        clubs_section = None
+        for header in soup.find_all(['h2', 'h3']):
+            if 'club' in header.get_text().lower():
+                # Find the next table after this header
+                clubs_section = header.find_next('table', class_='items')
+                break
         
-        # Look for links that match the team URL pattern
-        team_links = soup.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
+        # Strategy 2: If no clubs section header found, look for tables with club-specific patterns
+        if not clubs_section:
+            # Look for tables that have "verein" (German for club) in the href patterns
+            for table in soup.find_all('table', class_='items'):
+                links = table.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
+                if links:
+                    clubs_section = table
+                    break
+        
+        if not clubs_section:
+            return results
+        
+        # Now parse the clubs table
+        team_links = clubs_section.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
         
         seen_ids = set()  # Avoid duplicates
         
@@ -200,18 +222,18 @@ class TeamLookupService:
             seen_ids.add(team_id)
             
             # Get team name from link text
+            # Note: BeautifulSoup will decode HTML entities like &amp; to &
             found_name = link.get_text(strip=True)
             if not found_name:
                 continue
             
             # Try to find the league/country info nearby
             # Usually in the same row or parent element
-            parent_row = link.find_parent('tr') or link.find_parent('div')
+            parent_row = link.find_parent('tr')
             league_info = ""
-            country_info = ""
             
             if parent_row:
-                # Look for league/country text
+                # Look for league/country text in the row
                 row_text = parent_row.get_text(" ", strip=True).lower()
                 league_info = row_text
             
@@ -242,13 +264,32 @@ class TeamLookupService:
     
     def _fuzzy_match(self, search: str, found: str) -> bool:
         """Check if the found name matches the search term."""
-        # Simple matching - check if search terms are in found name
-        search_words = search.lower().split()
-        found_lower = found.lower()
+        search_lower = search.lower().strip()
+        found_lower = found.lower().strip()
         
-        # All search words should be in the found name
-        matches = sum(1 for word in search_words if word in found_lower)
-        return matches >= len(search_words) * 0.5  # At least 50% of words match
+        # Normalize "&" and "and" for comparison
+        search_normalized = search_lower.replace(' & ', ' and ').replace('&', 'and')
+        found_normalized = found_lower.replace(' & ', ' and ').replace('&', 'and')
+        
+        # Exact match
+        if search_normalized == found_normalized:
+            return True
+        
+        # Check if search is contained in found (e.g., "Arsenal" in "Arsenal FC")
+        if search_normalized in found_normalized:
+            return True
+        
+        # Check if found is contained in search (e.g., "Arsenal" in "Arsenal Football Club")
+        if found_normalized in search_normalized:
+            return True
+        
+        # Check if all search words are in found name (stricter than before)
+        # Using normalized versions
+        search_words = search_normalized.split()
+        matches = sum(1 for word in search_words if word in found_normalized)
+        
+        # Require ALL words to match for multi-word searches
+        return matches == len(search_words)
     
     def _check_league_match(self, target_league: str, found_text: str) -> bool:
         """Check if the found text contains league indicators."""
@@ -259,6 +300,40 @@ class TeamLookupService:
         identifiers = self.LEAGUE_MAPPINGS.get(target_lower, [target_lower])
         
         return any(ident in found_lower for ident in identifiers)
+    
+    def verify_team_in_browser(self, result: TeamLookupResult) -> bool:
+        """
+        Open the team's Transfermarkt page in a browser for user verification.
+        
+        Args:
+            result: TeamLookupResult to verify
+            
+        Returns:
+            True if user confirms, False otherwise
+        """
+        print("\n" + "=" * 60)
+        print("🔍 TEAM VERIFICATION")
+        print("=" * 60)
+        print(f"\n   Team:   {result.team_name}")
+        print(f"   League: {result.league}")
+        print(f"   Country: {result.country}")
+        print(f"   TM ID:  {result.transfermarkt_id}")
+        print(f"\n   URL: {result.transfermarkt_url}")
+        
+        print("\n📂 Opening browser for verification...")
+        webbrowser.open(result.transfermarkt_url)
+        
+        print("\n" + "-" * 60)
+        while True:
+            response = input("Is this the correct team roster? (yes/no): ").strip().lower()
+            if response in ('yes', 'y'):
+                print("   ✅ Team verified!")
+                return True
+            elif response in ('no', 'n'):
+                print("   ❌ Team rejected - not saving to database")
+                return False
+            else:
+                print("   Please enter 'yes' or 'no'")
     
     def add_team_to_database(self, result: TeamLookupResult) -> Optional[Team]:
         """
@@ -316,7 +391,8 @@ class TeamLookupService:
         team_name: str, 
         league: str,
         country: Optional[str] = None,
-        headless: bool = True
+        headless: bool = True,
+        verify: bool = True
     ) -> Optional[Team]:
         """
         Convenience method to lookup a team and add it to the database.
@@ -326,6 +402,7 @@ class TeamLookupService:
             league: League name
             country: Country (optional)
             headless: Run browser headless
+            verify: If True, open browser for user verification before saving
             
         Returns:
             Team object if successful, None otherwise
@@ -333,6 +410,11 @@ class TeamLookupService:
         result = await self.lookup_team(team_name, league, country, headless)
         
         if result:
+            # Verify with user if requested
+            if verify:
+                if not self.verify_team_in_browser(result):
+                    return None
+            
             return self.add_team_to_database(result)
         
         return None
@@ -348,11 +430,17 @@ async def main():
     
     # Parse arguments
     if len(sys.argv) < 3:
-        print("\nUsage: python -m src.services.team_lookup <team_name> <league> [--save]")
+        print("\nUsage: python -m src.services.team_lookup <team_name> <league> [--save] [--no-verify]")
+        print("\nOptions:")
+        print("  --save       Save team to database after lookup")
+        print("  --no-verify  Skip browser verification (use with caution)")
         print("\nExamples:")
         print('  python -m src.services.team_lookup "Manchester City" "Premier League"')
         print('  python -m src.services.team_lookup "Barcelona" "La Liga" --save')
         print('  python -m src.services.team_lookup "Bayern Munich" "Bundesliga" --save')
+        print("\nOr use make commands:")
+        print('  make team-lookup TEAM="Manchester City" LEAGUE="Premier League"')
+        print('  make team-add TEAM="Barcelona" LEAGUE="La Liga"')
         print("\nSupported leagues:")
         print("  - Premier League, Championship (England)")
         print("  - La Liga (Spain)")
@@ -366,21 +454,24 @@ async def main():
     team_name = sys.argv[1]
     league = sys.argv[2]
     save_to_db = "--save" in sys.argv
+    skip_verify = "--no-verify" in sys.argv
     
     service = TeamLookupService()
     
     if save_to_db:
-        print(f"\n📥 Looking up and saving: {team_name} ({league})")
-        team = await service.lookup_and_add(team_name, league)
+        print(f"\n📥 Looking up: {team_name} ({league})")
+        team = await service.lookup_and_add(team_name, league, verify=not skip_verify)
         if team:
-            print(f"\n✅ Team ready for roster scraping!")
+            print(f"\n✅ Team saved and ready for roster scraping!")
             print(f"   Run: make test-roster-update")
+        else:
+            print(f"\n❌ Team not saved to database")
     else:
         print(f"\n🔍 Looking up: {team_name} ({league})")
         result = await service.lookup_team(team_name, league)
         if result:
             print(f"\n📋 To add this team to the database, run:")
-            print(f'   python -m src.services.team_lookup "{team_name}" "{league}" --save')
+            print(f'   make team-add TEAM="{team_name}" LEAGUE="{league}"')
 
 
 if __name__ == "__main__":

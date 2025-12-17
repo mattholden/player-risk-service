@@ -1,15 +1,14 @@
 """
-Test script for saving alerts to the database.
+Test script for the AlertService.
 
-This script creates mock alerts and tests the database save functionality
+Tests saving, querying, and managing alerts through the new AlertService
 without running the full agent pipeline (avoiding expensive API calls).
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.agents.models import PlayerAlert
 from database.enums import AlertLevel
-from database import Alert, session_scope
-from src.services.agent_pipeline import AgentPipeline
+from database import AlertService
 
 
 def create_mock_alerts():
@@ -18,7 +17,6 @@ def create_mock_alerts():
     fixture = "Test Team A vs Test Team B"
     fixture_date = datetime(2025, 12, 31, 20, 0)
     
-    # Test case 1: Multiple alerts for different players
     alerts = [
         PlayerAlert(
             player_name="Test Player Alpha",
@@ -34,7 +32,6 @@ def create_mock_alerts():
             alert_level=AlertLevel.MEDIUM_ALERT,
             description="[Test Team A] Test Player Beta questionable with minor knock. Medium alert level."
         ),
-        # Test case 2: Same player with multiple alerts (different descriptions/contexts)
         PlayerAlert(
             player_name="Test Player Gamma",
             fixture=fixture,
@@ -49,7 +46,6 @@ def create_mock_alerts():
             alert_level=AlertLevel.MEDIUM_ALERT,
             description="[Test Team B] Test Player Gamma from opposition perspective - late fitness test required."
         ),
-        # Test case 3: Low alert
         PlayerAlert(
             player_name="Test Player Delta",
             fixture=fixture,
@@ -57,7 +53,6 @@ def create_mock_alerts():
             alert_level=AlertLevel.LOW_ALERT,
             description="[Test Team B] Test Player Delta positioned for increased minutes as backup option."
         ),
-        # Test case 4: No alert
         PlayerAlert(
             player_name="Test Player Epsilon",
             fixture=fixture,
@@ -71,9 +66,9 @@ def create_mock_alerts():
 
 
 def test_save_alerts():
-    """Test saving alerts using the pipeline method."""
+    """Test saving alerts using AlertService."""
     print("=" * 70)
-    print("🧪 Testing Alert Save Functionality")
+    print("🧪 Test 1: Save Alerts via AlertService")
     print("=" * 70)
     
     # Create mock alerts
@@ -89,138 +84,224 @@ def test_save_alerts():
         print(f"   Alert Level: {alert.alert_level.value}")
         print(f"   Description: {alert.description[:80]}...")
     
-    # Save alerts using pipeline method
-    print("\n" + "=" * 70)
-    print("💾 Saving alerts to database...")
-    print("=" * 70)
+    # Save alerts using AlertService
+    print("\n" + "-" * 70)
+    print("💾 Saving alerts via AlertService...")
     
     try:
-        pipeline = AgentPipeline()
-        pipeline._save_alerts(alerts)
-        print("✅ Alerts saved successfully!")
+        service = AlertService()
+        saved_count = service.save_alerts(alerts)
+        print(f"✅ AlertService.save_alerts() returned: {saved_count}")
+        return True
     except Exception as e:
         print(f"❌ Error saving alerts: {e}")
         import traceback
         traceback.print_exc()
         return False
     
-    # Verify alerts were saved
+
+def test_query_by_fixture():
+    """Test querying alerts by fixture."""
     print("\n" + "=" * 70)
-    print("🔍 Verifying alerts in database...")
+    print("🧪 Test 2: Query Alerts by Fixture")
     print("=" * 70)
     
     try:
-        with session_scope() as session:
-            saved_alerts = session.query(Alert).all()
-            print(f"\n✅ Found {len(saved_alerts)} alerts in database")
-            
-            # Display saved alerts
-            for i, alert in enumerate(saved_alerts, 1):
-                print(f"\n{i}. {alert.player_name}")
-                print(f"   Fixture: {alert.fixture}")
-                print(f"   Alert Level: {alert.alert_level.value}")
-                print(f"   Description: {alert.description[:60]}...")
-                print(f"   Created: {alert.created_at}")
-                print(f"   Acknowledged: {alert.acknowledged}")
-                print(f"   Active: {alert.active_projection}")
-            
-            # Check for duplicates (same player should be allowed)
-            player_names = [alert.player_name for alert in saved_alerts]
-            duplicate_players = set([name for name in player_names if player_names.count(name) > 1])
-            
-            if duplicate_players:
-                print(f"\n✅ Found duplicate player names (as expected): {duplicate_players}")
-                print("   Multiple alerts per player are allowed! ✓")
-            
-        return True
+        service = AlertService()
+        fixture = "Test Team A vs Test Team B"
         
+        alerts = service.get_alerts_for_fixture(fixture)
+        print(f"\n🏟️  Alerts for '{fixture}': {len(alerts)}")
+        
+        for alert in alerts:
+            print(f"   • {alert.player_name} ({alert.alert_level.value})")
+        
+        return True
     except Exception as e:
-        print(f"❌ Error verifying alerts: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-def test_query_alerts():
-    """Test querying alerts with various filters."""
+def test_query_multiple_fixtures():
+    """Test querying alerts for multiple fixtures."""
     print("\n" + "=" * 70)
-    print("🔍 Testing Alert Queries")
+    print("🧪 Test 3: Query Alerts for Multiple Fixtures")
     print("=" * 70)
     
     try:
-        with session_scope() as session:
-            # Query 1: High alerts only
-            high_alerts = session.query(Alert).filter(
-                Alert.alert_level == AlertLevel.HIGH_ALERT
-            ).all()
-            print(f"\n🚨 High Alerts: {len(high_alerts)}")
-            for alert in high_alerts:
-                print(f"   - {alert.player_name}: {alert.description[:50]}...")
+        service = AlertService()
+        fixtures = ["Test Team A vs Test Team B", "Nonexistent Fixture"]
+        
+        alerts = service.get_alerts_for_fixtures(fixtures)
+        print(f"\n📋 Alerts for {len(fixtures)} fixtures: {len(alerts)}")
+        
+        for alert in alerts:
+            print(f"   • {alert.player_name} - {alert.fixture}")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_query_active_alerts():
+    """Test querying active alerts."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 4: Query Active Alerts")
+    print("=" * 70)
+    
+    try:
+        service = AlertService()
+        
+        alerts = service.get_active_alerts()
+        print(f"\n⚡ Active alerts: {len(alerts)}")
             
-            # Query 2: Alerts for a specific player
-            player_name = "Test Player Gamma"
-            player_alerts = session.query(Alert).filter(
-                Alert.player_name == player_name
-            ).all()
-            print(f"\n👤 Alerts for {player_name}: {len(player_alerts)}")
-            for alert in player_alerts:
-                print(f"   - {alert.description[:50]}...")
-            
-            # Query 3: Active, unacknowledged alerts
-            active_alerts = session.query(Alert).filter(
-                Alert.active_projection == True,
-                Alert.acknowledged == False
-            ).all()
-            print(f"\n⚡ Active, Unacknowledged Alerts: {len(active_alerts)}")
-            
-            # Query 4: Alerts by fixture
-            fixture = "Test Team A vs Test Team B"
-            fixture_alerts = session.query(Alert).filter(
-                Alert.fixture == fixture
-            ).all()
-            print(f"\n🏟️  Alerts for {fixture}: {len(fixture_alerts)}")
+        # Group by alert level
+        from collections import Counter
+        levels = Counter(a.alert_level.value for a in alerts)
+        print("\n   By level:")
+        for level, count in sorted(levels.items()):
+            print(f"      {level}: {count}")
             
         return True
-        
     except Exception as e:
-        print(f"❌ Error querying alerts: {e}")
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_query_by_level():
+    """Test querying alerts by alert level."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 5: Query Alerts by Level")
+    print("=" * 70)
+    
+    try:
+        service = AlertService()
+        
+        # Query high and medium alerts
+        levels = [AlertLevel.HIGH_ALERT, AlertLevel.MEDIUM_ALERT]
+        alerts = service.get_alerts_by_level(levels)
+        
+        print(f"\n🚨 High/Medium alerts: {len(alerts)}")
+        for alert in alerts:
+            print(f"   • {alert.player_name} ({alert.alert_level.value})")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_query_alerts_since():
+    """Test querying alerts since a date."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 6: Query Alerts Since Date")
+    print("=" * 70)
+    
+    try:
+        service = AlertService()
+        
+        # Query alerts from the last hour
+        since = datetime.now() - timedelta(hours=1)
+        alerts = service.get_alerts_since(since)
+        
+        print(f"\n📅 Alerts in last hour: {len(alerts)}")
+        for alert in alerts[:5]:  # Show first 5
+            print(f"   • {alert.player_name} - {alert.created_at}")
+        
+        if len(alerts) > 5:
+            print(f"   ... and {len(alerts) - 5} more")
+            
+        return True
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_deactivate_fixture():
+    """Test deactivating alerts for a fixture."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 7: Deactivate Fixture Alerts")
+    print("=" * 70)
+    
+    try:
+        service = AlertService()
+        fixture = "Test Team A vs Test Team B"
+        
+        # Check active count before
+        before = service.get_alerts_for_fixture(fixture)
+        print(f"\n📊 Active alerts before: {len(before)}")
+        
+        # Deactivate
+        deactivated = service.deactivate_fixture_alerts(fixture)
+        print(f"🔒 Deactivated: {deactivated}")
+        
+        # Check active count after
+        after = service.get_alerts_for_fixture(fixture)
+        print(f"📊 Active alerts after: {len(after)}")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
 def main():
-    """Run all tests."""
+    """Run all AlertService tests."""
     print("\n" + "=" * 70)
-    print("🚀 ALERT DATABASE TESTING SUITE")
+    print("🚀 ALERT SERVICE TEST SUITE")
     print("=" * 70)
     
-    # Test 1: Save alerts
-    success = test_save_alerts()
+    tests = [
+        ("Save Alerts", test_save_alerts),
+        ("Query by Fixture", test_query_by_fixture),
+        ("Query Multiple Fixtures", test_query_multiple_fixtures),
+        ("Query Active Alerts", test_query_active_alerts),
+        ("Query by Level", test_query_by_level),
+        ("Query Since Date", test_query_alerts_since),
+        ("Deactivate Fixture", test_deactivate_fixture),
+    ]
     
-    if not success:
-        print("\n❌ Alert save test failed!")
-        return
+    results = []
+    for name, test_fn in tests:
+        try:
+            success = test_fn()
+            results.append((name, success))
+        except Exception as e:
+            print(f"❌ Test '{name}' crashed: {e}")
+            results.append((name, False))
     
-    # Test 2: Query alerts
-    success = test_query_alerts()
-    
-    if not success:
-        print("\n❌ Alert query test failed!")
-        return
-    
-    # Final summary
+    # Summary
     print("\n" + "=" * 70)
-    print("✅ ALL TESTS PASSED!")
+    print("📊 TEST SUMMARY")
     print("=" * 70)
-    print("\n📝 Summary:")
-    print("   ✓ Alerts can be saved to database")
-    print("   ✓ Multiple alerts per player are allowed")
-    print("   ✓ Alert queries work correctly")
-    print("   ✓ Database schema is correct")
-    print("\n🎉 Ready to run the full pipeline!")
+    
+    passed = sum(1 for _, success in results if success)
+    failed = len(results) - passed
+    
+    for name, success in results:
+        status = "✅" if success else "❌"
+        print(f"   {status} {name}")
+    
+    print(f"\n   Total: {passed}/{len(results)} passed")
+    
+    if failed == 0:
+        print("\n🎉 All tests passed! AlertService is working correctly.")
+    else:
+        print(f"\n⚠️  {failed} test(s) failed.")
 
 
 if __name__ == "__main__":
     main()
-

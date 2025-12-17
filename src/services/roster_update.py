@@ -310,6 +310,57 @@ class RosterUpdateService:
         
         return batch_result
     
+    async def update_fixture_rosters(
+        self,
+        fixture: str,
+        league: str = "Premier League"
+    ) -> list[UpdateResult]:
+        """
+        Update rosters for both teams in a fixture.
+        
+        Parses the fixture string to extract team names, then updates
+        each team's roster. If a team is not in the registry, attempts
+        to look it up on Transfermarkt and add it first.
+        
+        Args:
+            fixture: Fixture string (e.g., "Arsenal vs Brentford")
+            league: League name for team lookup (default: "Premier League")
+            
+        Returns:
+            List of UpdateResult for each team (0-2 results depending on success)
+        """
+        results = []
+        
+        # Parse fixture into team names
+        if " vs " not in fixture:
+            print(f"⚠️  Invalid fixture format: {fixture}")
+            return results
+        
+        teams = [t.strip() for t in fixture.split(" vs ")]
+        
+        for team_name in teams:
+            try:
+                # First, try to update the team
+                result = await self.update_team_by_name(team_name, league)
+                results.append(result)
+                
+                if result.success:
+                    print(f"   ✅ {team_name}: +{len(result.players_added)} added, "
+                          f"-{len(result.players_removed)} removed")
+                else:
+                    print(f"   ⚠️  {team_name}: {result.error} (continuing anyway)")
+                    
+            except Exception as e:
+                print(f"   ❌ {team_name}: {e} (continuing anyway)")
+                results.append(UpdateResult(
+                    team_name=team_name,
+                    league=league,
+                    success=False,
+                    error=str(e)
+                ))
+        
+        return results
+    
     async def update_league(self, league: str) -> BatchUpdateResult:
         """
         Update rosters for all teams in a specific league.

@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry check-roster
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -177,6 +177,11 @@ test-fixture-epl-dry:
 
 test-roster-sync:
 	python -m src.services.roster_sync
+
+# Quick roster check from database
+# Usage: make check-roster TEAM="Manchester United" LEAGUE="Premier League"
+check-roster:
+	python -m scripts.check_roster "$(TEAM)" "$(LEAGUE)"
 
 test-transfermarkt:
 	python -m src.services.transfermarkt_scraper

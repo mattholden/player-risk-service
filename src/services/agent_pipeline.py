@@ -41,13 +41,33 @@ class AgentPipeline:
     def run(self, fixture: str, fixture_date: datetime) -> List[PlayerAlert]:
         """
         Run the pipeline.
+        
+        New flow to prevent duplicate alerts:
+        1. Run Research + Analyst for both teams
+        2. Run Shark ONCE with combined data from both teams
+        
+        This prevents duplicate alerts for players who might be mentioned
+        in analysis of both teams.
         """
-        alerts = []
-        for context in self._generate_team_contexts(fixture, fixture_date):
-            research_agent_response = self.research_agent.research_team(context).findings['description']
-            analyst_agent_response = self.analyst_agent.analyze_injury_news(context, research_agent_response)
-            shark_agent_response = self.shark_agent.analyze_player_risk(context, research_agent_response, analyst_agent_response)
-            alerts.extend(shark_agent_response)
+        contexts = self._generate_team_contexts(fixture, fixture_date)
+        
+        # Step 1 & 2: Run research and analyst for both teams
+        team_analyses = []
+        for context in contexts:
+            print(f"\n📊 Processing {context.team}...")
+            research_response = self.research_agent.research_team(context).findings['description']
+            analyst_response = self.analyst_agent.analyze_injury_news(context, research_response)
+            
+            team_analyses.append({
+                'context': context,
+                'research': research_response,
+                'analyst': analyst_response
+            })
+        
+        # Step 3: Run shark ONCE with data from both teams
+        print(f"\n🦈 Running Shark Agent with combined fixture data...")
+        alerts = self.shark_agent.analyze_player_risk_for_fixture(team_analyses)
+        
         return alerts
 
     def run_and_save(self, fixture: str, fixture_date: datetime) -> List[PlayerAlert]:

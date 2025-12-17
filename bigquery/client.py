@@ -113,7 +113,8 @@ class BigQueryClient:
         df: pd.DataFrame,
         table_id: str,
         write_disposition: str = "WRITE_TRUNCATE",
-        schema: Optional[list] = None
+        schema: Optional[list] = None,
+        allow_schema_updates: bool = True
     ) -> None:
         """
         Write a DataFrame to a BigQuery table.
@@ -126,6 +127,7 @@ class BigQueryClient:
                 - WRITE_APPEND: Append to table
                 - WRITE_EMPTY: Fail if table exists
             schema: Optional explicit schema (list of bigquery.SchemaField)
+            allow_schema_updates: If True, allow new fields to be added to table schema
         """
         job_config = bigquery.LoadJobConfig(
             write_disposition=write_disposition,
@@ -133,6 +135,12 @@ class BigQueryClient:
         
         if schema:
             job_config.schema = schema
+        
+        # Allow schema updates (e.g., new columns from source table)
+        if allow_schema_updates:
+            job_config.schema_update_options = [
+                bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION
+            ]
         
         job = self.client.load_table_from_dataframe(
             df,

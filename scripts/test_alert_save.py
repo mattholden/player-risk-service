@@ -98,7 +98,7 @@ def test_save_alerts():
         import traceback
         traceback.print_exc()
         return False
-
+    
 
 def test_query_by_fixture():
     """Test querying alerts by fixture."""
@@ -159,14 +159,14 @@ def test_query_active_alerts():
         
         alerts = service.get_active_alerts()
         print(f"\n⚡ Active alerts: {len(alerts)}")
-        
+            
         # Group by alert level
         from collections import Counter
         levels = Counter(a.alert_level.value for a in alerts)
         print("\n   By level:")
         for level, count in sorted(levels.items()):
             print(f"      {level}: {count}")
-        
+            
         return True
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -219,7 +219,7 @@ def test_query_alerts_since():
         
         if len(alerts) > 5:
             print(f"   ... and {len(alerts) - 5} more")
-        
+            
         return True
     except Exception as e:
         print(f"❌ Error: {e}")

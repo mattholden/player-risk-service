@@ -123,9 +123,12 @@ class TeamLookupService:
             
             try:
                 # Build search URL
-                search_query = quote(team_name)
+                # Normalize the search query: replace "&" with "and" for better results
+                normalized_team_name = team_name.replace(' & ', ' and ').replace('&', ' and ')
+                search_query = quote(normalized_team_name)
                 url = f"{self.SEARCH_URL}?query={search_query}"
                 
+                print(f"   Search query: {normalized_team_name}")
                 print(f"   URL: {url}")
                 
                 # Navigate to search results
@@ -173,14 +176,32 @@ class TeamLookupService:
         """Parse Transfermarkt search results to find matching teams."""
         results = []
         
-        # Find the clubs section - look for header "Clubs" or similar
-        # The structure is: <div class="box"><h2>Clubs</h2>...</div>
+        # The search results page has multiple tables for different result types
+        # Find the "Clubs" section specifically - it has an id starting with "yw1"
+        # Look for the table with club results
         
-        # Find all result rows - team links typically have this structure:
-        # <a href="/fc-arsenal/startseite/verein/11">Arsenal FC</a>
+        # Strategy 1: Find the "Clubs" header and then the table below it
+        clubs_section = None
+        for header in soup.find_all(['h2', 'h3']):
+            if 'club' in header.get_text().lower():
+                # Find the next table after this header
+                clubs_section = header.find_next('table', class_='items')
+                break
         
-        # Look for links that match the team URL pattern
-        team_links = soup.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
+        # Strategy 2: If no clubs section header found, look for tables with club-specific patterns
+        if not clubs_section:
+            # Look for tables that have "verein" (German for club) in the href patterns
+            for table in soup.find_all('table', class_='items'):
+                links = table.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
+                if links:
+                    clubs_section = table
+                    break
+        
+        if not clubs_section:
+            return results
+        
+        # Now parse the clubs table
+        team_links = clubs_section.find_all('a', href=re.compile(r'/[^/]+/startseite/verein/\d+'))
         
         seen_ids = set()  # Avoid duplicates
         
@@ -201,18 +222,18 @@ class TeamLookupService:
             seen_ids.add(team_id)
             
             # Get team name from link text
+            # Note: BeautifulSoup will decode HTML entities like &amp; to &
             found_name = link.get_text(strip=True)
             if not found_name:
                 continue
             
             # Try to find the league/country info nearby
             # Usually in the same row or parent element
-            parent_row = link.find_parent('tr') or link.find_parent('div')
+            parent_row = link.find_parent('tr')
             league_info = ""
-            country_info = ""
             
             if parent_row:
-                # Look for league/country text
+                # Look for league/country text in the row
                 row_text = parent_row.get_text(" ", strip=True).lower()
                 league_info = row_text
             
@@ -246,21 +267,26 @@ class TeamLookupService:
         search_lower = search.lower().strip()
         found_lower = found.lower().strip()
         
+        # Normalize "&" and "and" for comparison
+        search_normalized = search_lower.replace(' & ', ' and ').replace('&', 'and')
+        found_normalized = found_lower.replace(' & ', ' and ').replace('&', 'and')
+        
         # Exact match
-        if search_lower == found_lower:
+        if search_normalized == found_normalized:
             return True
         
         # Check if search is contained in found (e.g., "Arsenal" in "Arsenal FC")
-        if search_lower in found_lower:
+        if search_normalized in found_normalized:
             return True
         
         # Check if found is contained in search (e.g., "Arsenal" in "Arsenal Football Club")
-        if found_lower in search_lower:
+        if found_normalized in search_normalized:
             return True
         
         # Check if all search words are in found name (stricter than before)
-        search_words = search_lower.split()
-        matches = sum(1 for word in search_words if word in found_lower)
+        # Using normalized versions
+        search_words = search_normalized.split()
+        matches = sum(1 for word in search_words if word in found_normalized)
         
         # Require ALL words to match for multi-word searches
         return matches == len(search_words)

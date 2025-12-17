@@ -133,10 +133,7 @@ class ProjectionAlertPipeline:
             fixture_date = datetime.now()
         
         # Run the agent pipeline
-        if self.dry_run:
-            print("   🔒 Dry run - skipping agent execution")
-            return []
-        
+        # Note: Dry run mode still runs agents (for testing), but skips BigQuery push
         try:
             alerts = self.agent_pipeline.run_and_save(fixture, fixture_date)
             print(f"   ✅ Generated {len(alerts)} alerts")
@@ -198,8 +195,13 @@ class ProjectionAlertPipeline:
             print("   ⚠️  No enriched projections to push")
             return 0
         
-        # Step 7: Push to BigQuery
-        self.projections_service.push_enriched_projections(enriched)
+        # Step 7: Push to BigQuery (skip in dry run mode)
+        if self.dry_run:
+            print(f"\n🔒 DRY RUN: Would push {len(enriched)} rows to BigQuery")
+            print(f"   Destination: {self.projections_service.dest_table_id}")
+            print(f"   (Skipping actual BigQuery write)")
+        else:
+            self.projections_service.push_enriched_projections(enriched)
         
         return len(enriched)
     

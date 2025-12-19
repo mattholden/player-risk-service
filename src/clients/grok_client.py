@@ -407,11 +407,11 @@ class GrokClient:
             elif role == 'user':
                 chat.append(user(content))
 
-        total_server_side_tool_calls = 0
-        total_client_side_tool_calls = 0
         research_turns = 0
         
         while True:
+            total_server_side_tool_calls = 0
+            total_client_side_tool_calls = 0
             research_turns += 1
             client_side_tool_calls = []
             

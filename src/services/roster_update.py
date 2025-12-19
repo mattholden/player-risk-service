@@ -405,61 +405,139 @@ class RosterUpdateService:
 
 async def main():
     """
-    Demo function showing the roster update service.
+    Roster update service CLI.
+    
+    Usage:
+        # Update all teams
+        python -m src.services.roster_update
+        
+        # Update a specific team
+        python -m src.services.roster_update --team "Arsenal" --league "Premier League"
+        
+        # Update all teams in a league
+        python -m src.services.roster_update --league "Premier League"
     """
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Update team rosters from Transfermarkt",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m src.services.roster_update                              # Update all teams
+  python -m src.services.roster_update --team "Arsenal" --league "Premier League"  # Single team
+  python -m src.services.roster_update --league "Premier League"    # All teams in league
+        """
+    )
+    
+    parser.add_argument(
+        '--team',
+        type=str,
+        help='Team name to update (requires --league)'
+    )
+    
+    parser.add_argument(
+        '--league',
+        type=str,
+        help='League to filter by (or use with --team for single team)'
+    )
+    
+    args = parser.parse_args()
+    
     print("=" * 60)
-    print("Roster Update Service - Demo")
+    print("Roster Update Service")
     print("=" * 60)
     
     service = RosterUpdateService()
     
-    # Check if we have any teams in the registry
-    teams = service.get_active_teams()
-    
-    if not teams:
-        print("\n⚠️  No teams found in registry!")
-        print("\nTo test, first add a team to the database:")
-        print("""
-    from database import session_scope
-    from database.models.team import Team
-    
-    with session_scope() as session:
-        team = Team(
-            team_name="Arsenal",
-            league="Premier League",
-            country="England",
-            transfermarkt_id=11,
-            transfermarkt_slug="fc-arsenal",
-            is_active=True
-        )
-        session.add(team)
-        """)
+    # Single team update
+    if args.team:
+        if not args.league:
+            print("\n❌ Error: --team requires --league")
+            print("   Example: --team 'Arsenal' --league 'Premier League'")
+            return
+        
+        print(f"\n🎯 Updating single team: {args.team} ({args.league})")
+        result = await service.update_team_by_name(args.team, args.league)
+        
+        if result.success:
+            added = len(result.players_added) if result.players_added else 0
+            removed = len(result.players_removed) if result.players_removed else 0
+            unchanged = result.players_unchanged or 0
+            
+            print(f"\n✅ {result.team_name} updated successfully!")
+            print(f"   Total players: {added + unchanged}")
+            if added > 0:
+                print(f"   Added: {added}")
+            if removed > 0:
+                print(f"   Removed: {removed}")
+            if unchanged > 0:
+                print(f"   Unchanged: {unchanged}")
+        else:
+            print(f"\n❌ Failed to update {args.team}: {result.error}")
         return
     
-    print(f"\n📋 Found {len(teams)} active teams in registry:")
+    # Get teams (optionally filtered by league)
+    teams = service.get_active_teams()
+    
+    if args.league:
+        teams = [t for t in teams if args.league.lower() in t.league.lower()]
+        print(f"\n🏆 Filtering to league: {args.league}")
+    
+    if not teams:
+        print("\n⚠️  No teams found!")
+        if args.league:
+            print(f"   No teams in registry for league: {args.league}")
+        else:
+            print("\nTo add a team, use:")
+            print('   make team-add TEAM="Arsenal" LEAGUE="Premier League"')
+        return
+    
+    print(f"\n📋 Found {len(teams)} team(s) to update:")
     for team in teams:
         print(f"  - {team.team_name} ({team.league})")
     
-    # Update all teams
+    # Update teams
     print("\n🔄 Starting roster updates...")
-    batch_result = await service.update_all_teams()
     
-    # Summary
-    print("\n📊 Summary:")
-    print(f"  Total teams: {batch_result.total_teams}")
-    print(f"  Successful: {batch_result.successful}")
-    print(f"  Failed: {batch_result.failed}")
-    print(f"  Duration: {batch_result.duration_seconds:.1f}s")
-    
-    # Show any failures
-    failed_results = [r for r in batch_result.results if not r.success]
-    if failed_results:
-        print("\n❌ Failed updates:")
-        for r in failed_results:
-            print(f"  - {r.team_name}: {r.error}")
+    if args.league:
+        # Update only teams in the specified league
+        results = []
+        for team in teams:
+            result = await service.update_team(team)
+            results.append(result)
+        
+        successful = sum(1 for r in results if r.success)
+        failed = sum(1 for r in results if not r.success)
+        
+        print(f"\n📊 Summary:")
+        print(f"  Total teams: {len(results)}")
+        print(f"  Successful: {successful}")
+        print(f"  Failed: {failed}")
+        
+        failed_results = [r for r in results if not r.success]
+        if failed_results:
+            print("\n❌ Failed updates:")
+            for r in failed_results:
+                print(f"  - {r.team_name}: {r.error}")
+    else:
+        # Update all teams using batch method
+        batch_result = await service.update_all_teams()
+        
+        print(f"\n📊 Summary:")
+        print(f"  Total teams: {batch_result.total_teams}")
+        print(f"  Successful: {batch_result.successful}")
+        print(f"  Failed: {batch_result.failed}")
+        print(f"  Duration: {batch_result.duration_seconds:.1f}s")
+        
+        failed_results = [r for r in batch_result.results if not r.success]
+        if failed_results:
+            print("\n❌ Failed updates:")
+            for r in failed_results:
+                print(f"  - {r.team_name}: {r.error}")
     
     print("\n" + "=" * 60)
-    print("Demo complete!")
+    print("Update complete!")
     print("=" * 60)
 
 

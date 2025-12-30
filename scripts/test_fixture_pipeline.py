@@ -53,50 +53,6 @@ async def list_fixtures(league_filter: str = None):
             print("\n⚠️  No fixtures found in BigQuery")
             return []
         
-        # Filter out past fixtures
-        now = datetime.now()
-        original_count = len(all_fixtures)
-        fixtures = []
-        skipped_fixtures = []
-        
-        for f in all_fixtures:
-            match_time = f.get('match_time')
-            # Handle different match_time formats
-            if match_time:
-                if isinstance(match_time, datetime):
-                    fixture_date = match_time
-                elif isinstance(match_time, str):
-                    try:
-                        if "T" in match_time:
-                            fixture_date = datetime.fromisoformat(match_time.replace('Z', '+00:00'))
-                        else:
-                            fixture_date = datetime.strptime(match_time[:10], "%Y-%m-%d")
-                    except ValueError:
-                        fixture_date = now  # Include if can't parse
-                else:
-                    # Try to convert date to datetime
-                    try:
-                        fixture_date = datetime.combine(match_time, datetime.min.time())
-                    except:
-                        fixture_date = now
-                
-                if fixture_date >= now:
-                    fixtures.append(f)
-                else:
-                    skipped_fixtures.append(f)
-            else:
-                fixtures.append(f)  # Include if no match_time
-        
-        if skipped_fixtures:
-            print(f"\n⏭️  Skipped {len(skipped_fixtures)} past fixture(s):")
-            for skipped in skipped_fixtures[:5]:  # Show first 5
-                print(f"   - {skipped['fixture']} ({skipped.get('match_time', 'Unknown')})")
-            if len(skipped_fixtures) > 5:
-                print(f"   ... and {len(skipped_fixtures) - 5} more")
-        
-        all_fixtures = fixtures
-        
-        # Apply league filter if provided
         if league_filter:
             fixtures = [
                 f for f in all_fixtures 

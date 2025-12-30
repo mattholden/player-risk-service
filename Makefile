@@ -135,6 +135,9 @@ test-bigquery:
 test-pipeline:
 	python -m scripts.test_pipeline
 
+test-pipeline-league:
+	python -m scripts.test_pipeline --league "$(LEAGUE)"
+
 test-pipeline-step1:
 	python -m scripts.test_pipeline --step 1
 

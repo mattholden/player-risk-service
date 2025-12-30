@@ -437,7 +437,7 @@ class GrokClient:
             
             # If no client-side tools were called, we're done
             if not client_side_tool_calls:
-                print(f"   ✅ Complete (no client-side tools needed)")
+                print("   ✅ Complete (no client-side tools needed)")
                 break
             
             # Execute your custom tools and add results

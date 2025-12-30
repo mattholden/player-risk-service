@@ -63,11 +63,11 @@ def test_simple_query(client: GrokClient):
             use_x_search=False
         )
         
-        print(f"✅ Response received:")
-        print(f"   Content: {response['content'][:100]}...")
+        print("✅ Response received:")
+        print(f"   Content: {response.get('content', '')[:100]}...")
         print(f"   Model: {response['model']}")
-        print(f"   Tokens: {response['usage']['total_tokens']}")
-        print(f"   Timestamp: {response['created_at']}")
+        print(f"   Sources: {response.get('sources', [])}")
+        print(f"   Usage: {response.get('usage', {})}")
         
         return True
         
@@ -190,13 +190,13 @@ def main():
         print("\n❌ Cannot proceed without valid API connection")
         return False
     
-    # # Test 2: Simple query
-    # if not test_simple_query(client):
-    #     print("\n⚠️  Simple query failed, but continuing...")
+    # Test 2: Simple query
+    if not test_simple_query(client):
+        print("\n⚠️  Simple query failed, but continuing...")
     
-    # # Test 3: Sports query with web_search
-    # if not test_sports_query(client):
-    #     print("\n⚠️  Sports query failed, but continuing...")
+    # Test 3: Sports query with web_search
+    if not test_sports_query(client):
+        print("\n⚠️  Sports query failed, but continuing...")
     
     # Test 4: X search
     if not test_x_search(client):

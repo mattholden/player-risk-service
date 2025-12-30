@@ -81,18 +81,10 @@ init-db:
 db-reset:
 	@echo "yes" | python -m scripts.init_db --reset
 
-test:
-	python run_tests.py
-
-test-article:
-	python -m scripts.test_article
-
-test-player:
-	python -m scripts.test_player
-
 test-grok:
 	python -m scripts.test_grok_client
 
+# Agent Tests
 test-research-agent:
 	python -m scripts.test_research_agent
 
@@ -134,27 +126,6 @@ prepare-rosters-league:
 
 test-bigquery:
 	python -m scripts.test_bigquery
-
-test-pipeline:
-	python -m scripts.test_pipeline
-
-test-pipeline-league:
-	python -m scripts.test_pipeline --league "$(LEAGUE)"
-
-test-pipeline-step1:
-	python -m scripts.test_pipeline --step 1
-
-test-pipeline-step2:
-	python -m scripts.test_pipeline --step 2 --fixture "$(FIXTURE)"
-
-test-pipeline-step4:
-	python -m scripts.test_pipeline --step 4 --fixture "$(FIXTURE)"
-
-test-pipeline-step6:
-	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)"
-
-test-pipeline-step6-dry:
-	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)" --dry-run
 
 # Full fixture pipeline testing (one fixture at a time)
 test-fixture-list:
@@ -227,23 +198,6 @@ export
 db-shell:
 	docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-db-tables:
-	@echo "Tables in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "\dt"
-
-db-articles:
-	@echo "Articles in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, title, source, published_at FROM articles ORDER BY published_at DESC LIMIT 10;"
-
-db-players:
-	@echo "Players in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, name, team, risk_tag, fixture FROM players ORDER BY created_at DESC;"
-
-db-teams:
-	@echo "Teams in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, team_name, league, transfermarkt_id, transfermarkt_slug, is_active FROM teams ORDER BY league, team_name;"
-
-# Team lookup - search Transfermarkt for team data
 # Usage: make team-lookup TEAM="Manchester City" LEAGUE="Premier League"
 team-lookup:
 	python -m src.services.team_lookup "$(TEAM)" "$(LEAGUE)"

@@ -232,7 +232,7 @@ class ProjectionAlertPipeline:
         
         # Step 1: Get fixtures
         if fixtures is None:
-            fixtures = self.get_fixtures() #TODO: add filter for league
+            fixtures = self.get_fixtures()
         
         if not fixtures:
             print("\n❌ No fixtures to process. Exiting.")

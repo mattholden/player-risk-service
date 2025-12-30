@@ -114,6 +114,9 @@ pipeline-dry-run:
 pipeline-fixtures:
 	python -m src.pipeline --fixtures-only
 
+pipeline-league:
+	python -m src.pipeline --league "$(LEAGUE)"
+
 prepare-rosters:
 	python -m src.services.roster_preparation
 

@@ -15,7 +15,7 @@ def create_mock_alerts():
     """Create mock PlayerAlert objects for testing."""
     
     fixture = "Test Team A vs Test Team B"
-    fixture_date = datetime(2025, 12, 31, 20, 0)
+    fixture_date = datetime(1900, 12, 31, 20, 0)
     
     alerts = [
         PlayerAlert(

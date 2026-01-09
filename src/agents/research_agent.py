@@ -134,10 +134,6 @@ class ResearchAgent:
                 print(f"⚠️  Failed to parse JSON response: {e}")
                 print(f"   Raw content: {response.get('content', '')[:200]}...")
                 content_json = {}
-
-            print(f"USAGE: {response.get('usage', {})}")
-            print(f"SOURCES: {response.get('sources', [])}")
-            print(f"SERVER SIDE TOOL USAGE: {response.get('server_side_tool_usage', {})}")
             
             return InjuryResearchFindings(
                 team_name=context.team,

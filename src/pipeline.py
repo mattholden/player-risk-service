@@ -35,14 +35,16 @@ class ProjectionAlertPipeline:
     pushing enriched projections back to BigQuery.
     """
     
-    def __init__(self, dry_run: bool = False):
+    def __init__(self, dry_run: bool = False, league: str = None):
         """
         Initialize the pipeline.
         
         Args:
             dry_run: If True, don't write to database or BigQuery
+            league: Filter fixtures by league (e.g., 'Premier League')
         """
         self.dry_run = dry_run
+        self.league = league
         self.projections_service = ProjectionsService()
         self.roster_update_service = RosterUpdateService()
         self.agent_pipeline = AgentPipeline()
@@ -64,6 +66,9 @@ class ProjectionAlertPipeline:
         print("="*60)
         
         fixtures = self.projections_service.get_upcoming_fixtures()
+
+        if self.league:
+            fixtures = [f for f in fixtures if self.league.lower() in f['league'].lower()]
         
         if not fixtures:
             print("⚠️  No fixtures found in projections table")
@@ -309,10 +314,16 @@ def main():
         action="store_true", 
         help="Only fetch and display fixtures, don't process"
     )
+
+    parser.add_argument(
+        "--league",
+        type=str,
+        help="Filter fixtures by league (e.g., 'Premier League')"
+    )
     
     args = parser.parse_args()
     
-    pipeline = ProjectionAlertPipeline(dry_run=args.dry_run)
+    pipeline = ProjectionAlertPipeline(dry_run=args.dry_run, league=args.league)
     
     if args.fixtures_only:
         pipeline.get_fixtures()

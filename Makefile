@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry check-roster roster-update-team roster-update-league
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -58,8 +58,8 @@ help:
 	@echo "  make test-fixture-index-dry INDEX=0       - Dry run fixture by index"
 	@echo "  make test-fixture-epl INDEX=0             - Run Premier League fixture by index"
 	@echo "  make test-fixture-epl-dry INDEX=0         - Dry run Premier League fixture"
-	@echo "  make test-pipeline-step6 FIXTURE='Team A vs Team B' - Test BigQuery enrichment"
-	@echo "  make test-pipeline-step6-dry FIXTURE='Team A vs Team B' - Test enrichment (dry run)"
+	@echo "  make test-fixture-epl-all                 - Run ALL EPL fixtures (push after each)"
+
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -81,18 +81,10 @@ init-db:
 db-reset:
 	@echo "yes" | python -m scripts.init_db --reset
 
-test:
-	python run_tests.py
-
-test-article:
-	python -m scripts.test_article
-
-test-player:
-	python -m scripts.test_player
-
 test-grok:
 	python -m scripts.test_grok_client
 
+# Agent Tests
 test-research-agent:
 	python -m scripts.test_research_agent
 
@@ -114,6 +106,9 @@ pipeline-dry-run:
 pipeline-fixtures:
 	python -m src.pipeline --fixtures-only
 
+pipeline-league:
+	python -m src.pipeline --league "$(LEAGUE)"
+
 prepare-rosters:
 	python -m src.services.roster_preparation
 
@@ -131,24 +126,6 @@ prepare-rosters-league:
 
 test-bigquery:
 	python -m scripts.test_bigquery
-
-test-pipeline:
-	python -m scripts.test_pipeline
-
-test-pipeline-step1:
-	python -m scripts.test_pipeline --step 1
-
-test-pipeline-step2:
-	python -m scripts.test_pipeline --step 2 --fixture "$(FIXTURE)"
-
-test-pipeline-step4:
-	python -m scripts.test_pipeline --step 4 --fixture "$(FIXTURE)"
-
-test-pipeline-step6:
-	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)"
-
-test-pipeline-step6-dry:
-	python -m scripts.test_pipeline --step 6 --fixture "$(FIXTURE)" --dry-run
 
 # Full fixture pipeline testing (one fixture at a time)
 test-fixture-list:
@@ -175,14 +152,42 @@ test-fixture-epl:
 test-fixture-epl-dry:
 	python -m scripts.test_fixture_pipeline --index $(INDEX) --league "Premier League" --dry-run
 
+# Usage: make test-fixture-epl-all
+test-fixture-epl-all:
+	@echo "🏃 Running all Premier League fixtures..."
+	@for i in 0 1 2 3 4 5 6 7 8; do \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "🎯 FIXTURE $$i of 9"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		python -m scripts.test_fixture_pipeline --index $$i --league "Premier League" || exit 1; \
+	done
+	@echo ""
+	@echo "✅ All Premier League fixtures complete!"
+
 test-roster-sync:
 	python -m src.services.roster_sync
+
+# Quick roster check from database
+# Usage: make check-roster TEAM="Manchester United" LEAGUE="Premier League"
+check-roster:
+	python -m scripts.check_roster "$(TEAM)" "$(LEAGUE)"
 
 test-transfermarkt:
 	python -m src.services.transfermarkt_scraper
 
 test-roster-update:
 	python -m src.services.roster_update
+
+# Update roster for a specific team
+# Usage: make roster-update-team TEAM="Arsenal" LEAGUE="Premier League"
+roster-update-team:
+	python -m src.services.roster_update --team "$(TEAM)" --league "$(LEAGUE)"
+
+# Update rosters for all teams in a league
+# Usage: make roster-update-league LEAGUE="Premier League"
+roster-update-league:
+	python -m src.services.roster_update --league "$(LEAGUE)"
 
 test-custom-tool:
 	python -m scripts.test_custom_tool
@@ -206,23 +211,6 @@ export
 db-shell:
 	docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-db-tables:
-	@echo "Tables in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "\dt"
-
-db-articles:
-	@echo "Articles in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, title, source, published_at FROM articles ORDER BY published_at DESC LIMIT 10;"
-
-db-players:
-	@echo "Players in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, name, team, risk_tag, fixture FROM players ORDER BY created_at DESC;"
-
-db-teams:
-	@echo "Teams in database:"
-	@docker-compose exec postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -c "SELECT id, team_name, league, transfermarkt_id, transfermarkt_slug, is_active FROM teams ORDER BY league, team_name;"
-
-# Team lookup - search Transfermarkt for team data
 # Usage: make team-lookup TEAM="Manchester City" LEAGUE="Premier League"
 team-lookup:
 	python -m src.services.team_lookup "$(TEAM)" "$(LEAGUE)"

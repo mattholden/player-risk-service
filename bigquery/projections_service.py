@@ -94,12 +94,16 @@ class ProjectionsService:
                     {'fixture': 'Liverpool vs Brighton', 'match_time': '2025-12-04 20:00:00', 'league': 'Premier League'}
                 ]
         """
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        
         query = f"""
             SELECT DISTINCT 
                 {fixture_column} as fixture,
                 {match_time_column} as match_time,
                 {league_column} as league
             FROM `{self.source_table_id}`
+            WHERE {match_time_column} > '{today}'
             ORDER BY {match_time_column}
         """
         

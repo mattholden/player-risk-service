@@ -406,45 +406,51 @@ class GrokClient:
                 chat.append(system(content))
             elif role == 'user':
                 chat.append(user(content))
+
+        research_turns = 0
+        
         while True:
+            total_server_side_tool_calls = 0
+            total_client_side_tool_calls = 0
+            research_turns += 1
             client_side_tool_calls = []
+            
+            # Print turn header
+            print(f"\n📊 Research Turn {research_turns}:")
+            print("   Client: 0 | Server: 0", end="", flush=True)
+            
             for response, chunk in chat.stream():
-                if chunk.content:
-                    print(f"{chunk.content}", end="", flush=True)
-
-                if chunk.reasoning_content:
-                    print(f"{chunk.reasoning_content}", end="", flush=True)
-
                 for tool_call in chunk.tool_calls:
                     tool_type = get_tool_call_type(tool_call)
-                    print(f"TOOL TYPE: {tool_type}\n")
                     if tool_type == "client_side_tool":
                         client_side_tool_calls.append(tool_call)
-                        print(f"Client Tool: {tool_call.function.name}\n")
+                        total_client_side_tool_calls += 1
                     else:
-                        print(f"[Server tool: {tool_call.function.name}]\n")
-
-                # Add the response to conversation history
+                        total_server_side_tool_calls += 1
+                    
+                    # Update the counts in-place using \r
+                    print(f"\r   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}", end="", flush=True)
+                    
+            # Finish the line after streaming completes
+            print()  # Move to new line
             chat.append(response)
             
             # If no client-side tools were called, we're done
-            print(f"CLIENT SIDE TOOL CALLS: {client_side_tool_calls}")
             if not client_side_tool_calls:
+                print("   ✅ Complete (no client-side tools needed)")
                 break
             
             # Execute your custom tools and add results
+            print(f"   🔧 Executing {len(client_side_tool_calls)} client-side tool(s):")
             for tool_call in client_side_tool_calls:
-                print(f"\n[Calling: {tool_call.function.name}]\n")
+                print(f"      → {tool_call.function.name}")
                 if tool_call.function.name in custom_tools_names:
                     result = tool_registry.execute(tool_call.function.name, json.loads(tool_call.function.arguments))
                     chat.append(tool_result(result))
                 else:
-                    print(f"UNKNOWN CUSTOM TOOL: {tool_call.function.name}\n")
+                    print(f"      ⚠️  Unknown tool: {tool_call.function.name}")
                     continue
-        
-        print(f"Number of messages: {len(chat.messages)}")
-        for i, msg in enumerate(chat.messages):
-            print(f"[{i}] Role: {msg.role}, No Tool Calls: {len(msg.tool_calls)}, Tool Used: {msg.tool_calls}")
+            
 
         return {
             "content": response.content,

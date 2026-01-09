@@ -58,8 +58,8 @@ help:
 	@echo "  make test-fixture-index-dry INDEX=0       - Dry run fixture by index"
 	@echo "  make test-fixture-epl INDEX=0             - Run Premier League fixture by index"
 	@echo "  make test-fixture-epl-dry INDEX=0         - Dry run Premier League fixture"
-	@echo "  make test-pipeline-step6 FIXTURE='Team A vs Team B' - Test BigQuery enrichment"
-	@echo "  make test-pipeline-step6-dry FIXTURE='Team A vs Team B' - Test enrichment (dry run)"
+	@echo "  make test-fixture-epl-all                 - Run ALL EPL fixtures (push after each)"
+
 	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
@@ -151,6 +151,19 @@ test-fixture-epl:
 
 test-fixture-epl-dry:
 	python -m scripts.test_fixture_pipeline --index $(INDEX) --league "Premier League" --dry-run
+
+# Usage: make test-fixture-epl-all
+test-fixture-epl-all:
+	@echo "🏃 Running all Premier League fixtures..."
+	@for i in 0 1 2 3 4 5 6 7 8; do \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "🎯 FIXTURE $$i of 9"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		python -m scripts.test_fixture_pipeline --index $$i --league "Premier League" || exit 1; \
+	done
+	@echo ""
+	@echo "✅ All Premier League fixtures complete!"
 
 test-roster-sync:
 	python -m src.services.roster_sync

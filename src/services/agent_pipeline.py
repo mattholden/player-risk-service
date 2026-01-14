@@ -10,15 +10,16 @@ class AgentPipeline:
     """
     Pipeline that orchestrates the agents.
     """
-    def __init__(self):
+    def __init__(self, run_id: str):
         """
         Initialize the pipeline.
         """
+        self.run_id = run_id
         self.grok_client = GrokClient()
         self.analyst_agent = AnalystAgent(self.grok_client)
         self.shark_agent = SharkAgent(self.grok_client)
         self.research_agent = ResearchAgent(self.grok_client)
-        self.alert_service = AlertService()
+        self.alert_service = AlertService(run_id=self.run_id)
 
     def _generate_team_contexts(self, fixture: str, fixture_date: datetime) -> List[TeamContext]:
         """Generate a team context for a fixture."""

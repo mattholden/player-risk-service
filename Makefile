@@ -100,14 +100,8 @@ test-alert-save:
 pipeline:
 	python -m src.pipeline
 
-pipeline-dry-run:
-	python -m src.pipeline --dry-run
-
-pipeline-fixtures:
-	python -m src.pipeline --fixtures-only
-
-pipeline-league:
-	python -m src.pipeline --league "$(LEAGUE)"
+pipeline-enrich-only:
+	python -m src.pipeline --enrich-only $(RUN_ID)
 
 prepare-rosters:
 	python -m src.services.roster_preparation

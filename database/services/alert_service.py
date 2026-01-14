@@ -33,6 +33,9 @@ class AlertService:
         alerts = service.get_alerts_for_fixture("Arsenal vs Brentford")
         active = service.get_active_alerts()
     """
+
+    def __init__(self, run_id: str):
+        self.run_id = run_id
     
     def save_alerts(self, alerts: List["PlayerAlert"]) -> int:
         """
@@ -61,7 +64,8 @@ class AlertService:
                     last_alert_update=datetime.now(),
                     acknowledged=False,
                     active_projection=True,
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
+                    run_id=self.run_id
                 )
                 session.add(db_alert)
                 saved_count += 1
@@ -243,6 +247,7 @@ class AlertService:
         """
         return Alert(
             id=alert.id,
+            run_id=alert.run_id,
             player_name=alert.player_name,
             fixture=alert.fixture,
             fixture_date=alert.fixture_date,
@@ -253,4 +258,13 @@ class AlertService:
             active_projection=alert.active_projection,
             created_at=alert.created_at
         )
+
+    def get_alerts_by_run_id(self, run_id: str) -> List[Alert]:
+        """Get all alerts from a specific pipeline run."""
+        with session_scope() as session:
+            alerts = session.query(Alert).filter(
+                Alert.run_id == run_id
+            ).order_by(Alert.created_at).all()
+            
+            return [self._detach_alert(a) for a in alerts]
 

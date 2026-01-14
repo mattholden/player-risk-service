@@ -233,12 +233,12 @@ class ActiveRosterTool(BaseTool):
             "message": f"No roster found in database for {team}. Please use web search to find the current squad.",
             "suggested_sources": [
                 f"https://www.transfermarkt.com (search '{team} squad 2025/26')",
+                "https://us.soccerway.com (comprehensive squad lists)",
                 f"Official club website (search '{team} official squad')",
-                "https://us.soccerway.com (comprehensive squad lists)"
             ],
             "search_suggestions": [
-                f'"{team}" official squad 2025/26',
-                f'"{team}" current roster',
-                f'site:transfermarkt.com "{team}" squad'
+                f'"{team},{league}" official squad 2025/26',
+                f'"{team},{league}" current roster',
+                f'site:transfermarkt.com "{team},{league}" squad'
             ]
         })

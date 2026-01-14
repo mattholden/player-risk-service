@@ -54,6 +54,7 @@ class ProjectionsService:
             dest_dataset: Dataset for enriched output (env: BIGQUERY_DEST_DATASET)
             dest_table: Table for enriched output (env: BIGQUERY_DEST_TABLE)
         """
+        self.today = datetime.now().strftime('%Y-%m-%d')
         self.client = client or BigQueryClient()
         self.matcher = PlayerMatcher()
         
@@ -95,15 +96,13 @@ class ProjectionsService:
                 ]
         """
         
-        today = datetime.now().strftime('%Y-%m-%d')
-        
         query = f"""
             SELECT DISTINCT 
                 {fixture_column} as fixture,
                 {match_time_column} as match_time,
                 {league_column} as league
             FROM `{self.source_table_id}`
-            WHERE {match_time_column} > '{today}'
+            WHERE {match_time_column} > '{self.today}'
             ORDER BY {match_time_column}
         """
         
@@ -178,12 +177,15 @@ class ProjectionsService:
             return pd.DataFrame()
         
         # Build IN clause for fixtures
-        fixtures_str = ", ".join([f"'{f}'" for f in fixtures])
+        fixtures_str = ", ".join([self._escape_quotes(f) for f in fixtures])
+        print(f"DEBUG fixtures_str: {fixtures_str}") #######
         query = f"""
             SELECT * 
             FROM `{self.source_table_id}`
             WHERE {fixture_column} IN ({fixtures_str})
+            AND match_time > '{self.today}'
         """
+        print(f"DEBUG full query:\n{query}")  # Add this
         
         print(f"📊 Fetching projections for {len(fixtures)} fixtures...")
         df = self.client.query(query)
@@ -395,4 +397,10 @@ class ProjectionsService:
         print(f"{'='*60}")
         
         return enriched
+
+    def _escape_quotes(self, s: str) -> str:
+        """Escape single quotes for SQL strings and wrap in quotes."""
+        # Use backslash escaping instead of doubled quotes
+        escaped = s.replace("\\", "\\\\").replace("'", "\\'")
+        return f"'{escaped}'"
 

@@ -19,8 +19,7 @@ from database import session_scope
 from database.models.team import Team
 from src.services.roster_sync import RosterSyncService
 from src.services.transfermarkt_scraper import TransfermarktScraper, ScraperConfig
-
-
+from src.logging import get_logger
 @dataclass
 class UpdateResult:
     """
@@ -117,6 +116,8 @@ class RosterUpdateService:
         """
         self.scraper = TransfermarktScraper(config=scraper_config)
         self.sync_service = RosterSyncService()
+        self.logger = get_logger()
+        self.logger.success("Roster Update Service Initialized")
     
     def get_active_teams(self) -> List[Team]:
         """

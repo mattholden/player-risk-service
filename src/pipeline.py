@@ -38,7 +38,7 @@ class ProjectionAlertPipeline:
         
         self.run_id = get_run_id()
         self.logger = get_logger()
-        self.logger.info(f"Run ID: {self.run_id}")
+        self.logger.section(f"\nRun ID: {self.run_id}\n")
             
         self.dry_run = self.config.dry_run
         self.leagues = self.config.leagues
@@ -49,6 +49,7 @@ class ProjectionAlertPipeline:
         self.projections_service = ProjectionsService()
         self.roster_update_service = RosterUpdateService()
         self.agent_pipeline = AgentPipeline(self.run_id)
+        self.logger.success("Projection Alert Pipeline Initialized")
     
     # =========================================================================
     # Step 1: Fetch Fixtures
@@ -61,9 +62,8 @@ class ProjectionAlertPipeline:
         Returns:
             list[dict]: Fixtures with 'fixture' and 'match_time' keys
         """
-        print("\n" + "="*60)
-        print("📅 STEP 1: Fetching Fixtures")
-        print("="*60)
+
+        self.logger.section("📅 STEP 1: Fetching Fixtures")
         
         fixtures = self.projections_service.get_upcoming_fixtures()
 
@@ -72,14 +72,11 @@ class ProjectionAlertPipeline:
                 f for f in fixtures 
                 if any(league.lower() in f['league'].lower() for league in self.leagues)
             ]
+
+        self.logger.pipeline_fixtures(fixtures)
         
         if not fixtures:
-            print("⚠️  No fixtures found in projections table")
             return []
-        
-        print(f"\n📋 Found {len(fixtures)} fixtures:")
-        for i, f in enumerate(fixtures, 1):
-            print(f"   {i}. {f['fixture']} @ {f['match_time']} ({f['league']})")
         
         return fixtures
     

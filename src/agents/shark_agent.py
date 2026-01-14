@@ -5,7 +5,7 @@ import json
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, PlayerAlert
 from database.enums import AlertLevel
-
+from src.logging import get_logger
 class SharkAgent:
     """
     Agent that uses the Shark API to get the latest news and information about a team.
@@ -15,7 +15,8 @@ class SharkAgent:
         Initialize Shark Agent.
         """
         self.grok_client = grok_client
-        print("✅ Shark Agent initialized")
+        self.logger = get_logger()
+        self.logger.success("Shark Agent Initialized")
 
     def analyze_player_risk_for_fixture(
         self,

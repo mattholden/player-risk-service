@@ -17,7 +17,7 @@ from bigquery.client import BigQueryClient
 from src.utils.matching import PlayerMatcher
 from src.agents.models import PlayerAlert
 from database.models.alert import Alert
-
+from src.logging import get_logger
 # Type alias for alert objects - accepts either pydantic model or database model
 AlertLike = Union[PlayerAlert, Alert]
 
@@ -57,7 +57,7 @@ class ProjectionsService:
         self.today = datetime.now().strftime('%Y-%m-%d')
         self.client = client or BigQueryClient()
         self.matcher = PlayerMatcher()
-        
+        self.logger = get_logger()
         # Source table configuration
         self.source_dataset = source_dataset or os.getenv("BIGQUERY_SOURCE_DATASET")
         self.source_table = source_table or os.getenv("BIGQUERY_SOURCE_TABLE")
@@ -70,6 +70,8 @@ class ProjectionsService:
         project_id = self.client.project_id
         self.source_table_id = f"{project_id}.{self.source_dataset}.{self.source_table}"
         self.dest_table_id = f"{project_id}.{self.dest_dataset}.{self.dest_table}"
+
+        self.logger.success("Projections Service Initialized")
     
     def get_upcoming_fixtures(
         self,
@@ -106,12 +108,8 @@ class ProjectionsService:
             ORDER BY {match_time_column}
         """
         
-        print("📅 Fetching upcoming fixtures from BigQuery...")
-        
         df = self.client.query(query)
         fixtures = df.to_dict(orient="records")
-        
-        print(f"   Found {len(fixtures)} fixtures")
         
         return fixtures
     

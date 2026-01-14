@@ -6,6 +6,7 @@ from src.agents.models import TeamContext, PlayerAlert
 from datetime import datetime
 from typing import List
 from database import AlertService
+from src.logging import get_logger
 class AgentPipeline:
     """
     Pipeline that orchestrates the agents.
@@ -15,11 +16,13 @@ class AgentPipeline:
         Initialize the pipeline.
         """
         self.run_id = run_id
+        self.logger = get_logger()
         self.grok_client = GrokClient()
         self.analyst_agent = AnalystAgent(self.grok_client)
         self.shark_agent = SharkAgent(self.grok_client)
         self.research_agent = ResearchAgent(self.grok_client)
         self.alert_service = AlertService(run_id=self.run_id)
+        self.logger.success("Agent Pipeline Initialized")
 
     def _generate_team_contexts(self, fixture: str, fixture_date: datetime) -> List[TeamContext]:
         """Generate a team context for a fixture."""

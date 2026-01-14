@@ -20,12 +20,8 @@ class PipelineLogger:
     def __init__(self):
         self.run_id = get_run_id()
         
-        # Level from environment variable (LOG_LEVEL=DEBUG to see debug messages)
-        level_name = os.getenv("LOG_LEVEL", "INFO").upper()
-        level = getattr(logging, level_name, logging.INFO)
-        
         self.logger = logging.getLogger(f"{self.run_id}")
-        self.logger.setLevel(level)
+        self.logger.setLevel(logging.DEBUG)
         self.logger.handlers.clear()
         
         # File handler - always logs everything
@@ -39,7 +35,7 @@ class PipelineLogger:
         
         # Console handler - respects LOG_LEVEL
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
+        console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(console_handler)
     
@@ -69,13 +65,13 @@ class PipelineLogger:
         """Section header with dividers."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info(title)
-        self.logger.info(f"{'='*60}")
+        self.logger.info(f"{'='*60}\n")
     
     def subsection(self, title: str):
         """Subsection header with smaller dividers."""
         self.logger.info(f"\n{'─'*60}")
         self.logger.info(title)
-        self.logger.info(f"{'─'*60}")
+        self.logger.info(f"{'─'*60}\n")
     
     def detail(self, msg: str):
         """Indented detail message."""
@@ -89,3 +85,16 @@ class PipelineLogger:
         self.logger.debug(f"{'='*70}")
         self.logger.debug(json.dumps(data, indent=2, default=str))
         self.logger.debug(f"{'='*70}\n")
+
+    def pipeline_fixtures(self, fixtures: list[dict]):
+        """Log the fixtures for the pipeline."""
+
+        if not fixtures:
+            self.error("No fixtures found in projections table")
+            return
+
+        self.info(f"📋 Found {len(fixtures)} fixtures.")
+        for i, f in enumerate(fixtures, 1):
+            self.debug(f"   {i}. {f['fixture']} @ {f['match_time']} ({f['league']})")
+
+        self.success("Fetching Fixtures Complete")

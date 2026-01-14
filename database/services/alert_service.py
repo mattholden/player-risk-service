@@ -14,6 +14,7 @@ from typing import List, Optional, TYPE_CHECKING
 from database.database import session_scope
 from database.models.alert import Alert
 from database.enums import AlertLevel
+from src.logging import get_logger
 
 if TYPE_CHECKING:
     from src.agents.models import PlayerAlert
@@ -36,6 +37,8 @@ class AlertService:
 
     def __init__(self, run_id: str):
         self.run_id = run_id
+        self.logger = get_logger()
+        self.logger.success("Alert Service Initialized")
     
     def save_alerts(self, alerts: List["PlayerAlert"]) -> int:
         """

@@ -26,6 +26,7 @@ from tenacity import (  # type: ignore
     retry_if_exception_type
 )
 from xai_sdk.proto import chat_pb2
+from src.logging import get_logger
 
 
 class RateLimitExceeded(Exception):
@@ -71,6 +72,7 @@ class GrokClient:
         """
         # Try both XAI_API_KEY and GROK_API_KEY for backwards compatibility
         self.api_key = os.getenv('GROK_API_KEY', '').strip()
+        self.logger = get_logger()
         
         if not self.api_key:
             raise ValueError(
@@ -87,7 +89,7 @@ class GrokClient:
         # Rate limiting tracking
         self._request_timestamps: List[datetime] = []
         
-        print(f"✅ GrokClient initialized (model: {model}, using xAI SDK)")
+        self.logger.success(f"Grok Client Initialized (model: {model}, using xAI SDK)")
     
     def _check_rate_limit(self) -> None:
         """

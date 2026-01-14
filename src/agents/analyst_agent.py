@@ -5,7 +5,7 @@ import re
 
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, Source, TeamAnalysis
-
+from src.logging import get_logger
 
 class AnalystAgent:
     """
@@ -19,7 +19,8 @@ class AnalystAgent:
             grok_client: Initialized GrokClient instance
         """
         self.grok_client = grok_client
-        print("✅ Analyst Agent initialized")
+        self.logger = get_logger()
+        self.logger.success("Analyst Agent Initialized")
 
     def analyze_injury_news(
         self,

@@ -18,7 +18,7 @@ import json
 from src.clients.grok_client import GrokClient
 from src.agents.models import InjuryResearchFindings, TeamContext
 from src.tools import tool_registry, ActiveRosterTool
-
+from src.logging import get_logger
 
 class ResearchAgent:
     """
@@ -45,7 +45,8 @@ class ResearchAgent:
             grok_client: Initialized GrokClient instance
         """
         self.grok_client = grok_client
-        print("✅ ResearchAgent initialized")
+        self.logger = get_logger()
+        self.logger.success("Research Agent Initialized")
     
     def research_team(
         self, 

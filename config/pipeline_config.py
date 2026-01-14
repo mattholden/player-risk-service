@@ -10,6 +10,7 @@ class PipelineConfig:
     fixtures_only: bool = False
     leagues: list[str] | str | None = None
     push_all: bool = True
+    verbose: bool = False
     
     @classmethod
     def from_file(cls, path: str | Path = "config/pipeline_config.json") -> "PipelineConfig":

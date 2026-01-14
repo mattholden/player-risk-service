@@ -1,76 +1,91 @@
 import logging
+import os
 from pathlib import Path
-from datetime import datetime
 from typing import Optional
+from src.utils.run_id import get_run_id
 
 _logger_instance: Optional['PipelineLogger'] = None
 
 def get_logger() -> 'PipelineLogger':
-    """
-    Get the global logger instance.
-    
-    If not initialized, creates a default logger.
-    Call init_logger() first in entry points for proper context.
-    """
+    """Get the global logger instance. Creates one if needed."""
     global _logger_instance
     if _logger_instance is None:
-        # Auto-init with generic context if someone forgot to init
-        _logger_instance = PipelineLogger(context="default")
+        _logger_instance = PipelineLogger()
     return _logger_instance
 
-def init_logger(
-    context: str,
-    level: int = logging.INFO,
-    console: bool = True
-) -> 'PipelineLogger':
-    """
-    Initialize the global logger. Call this ONCE at your entry point.
-    
-    Args:
-        context: What's running (e.g., "pipeline", "test_roster", "roster_sync")
-        level: logging.DEBUG, logging.INFO, etc.
-        console: Whether to also print to stdout
-        
-    Returns:
-        The initialized logger instance
-    """
-    global _logger_instance
-    _logger_instance = PipelineLogger(context=context, level=level, console=console)
-    return _logger_instance
 
 class PipelineLogger:
-    """Semantic logger for all pipeline operations."""
+    """Universal logger - no configuration needed."""
     
-    def __init__(
-        self,
-        context: str = "default",
-        level: int = logging.INFO,
-        console: bool = True
-    ):
-        self.run_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        self.context = context
+    def __init__(self):
+        self.run_id = get_run_id()
         
-        # Create logger with unique name
-        self.logger = logging.getLogger(f"player_risk.{self.run_id}")
+        # Level from environment variable (LOG_LEVEL=DEBUG to see debug messages)
+        level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+        level = getattr(logging, level_name, logging.INFO)
+        
+        self.logger = logging.getLogger(f"{self.run_id}")
         self.logger.setLevel(level)
-        self.logger.handlers.clear()  # Prevent duplicate handlers
+        self.logger.handlers.clear()
         
-        # File handler - context in filename
+        # File handler - always logs everything
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
-        log_file = log_dir / f"{self.run_id}_{context}.log"
-        
-        file_handler = logging.FileHandler(log_file)
+        self.log_file = log_dir / f"{self.run_id}.log"
+        file_handler = logging.FileHandler(self.log_file)
+        file_handler.setLevel(logging.DEBUG)  # File gets ALL messages
         file_handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(file_handler)
         
-        # Optional console handler
-        if console:
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(logging.Formatter('%(message)s'))
-            self.logger.addHandler(console_handler)
-        
-        self.log_file = log_file
+        # Console handler - respects LOG_LEVEL
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(logging.Formatter('%(message)s'))
+        self.logger.addHandler(console_handler)
     
-    # ─── Semantic Methods ───────────────────────────────────────
-    # (same as before: fixture(), success(), warning(), etc.)
+    # ─── Semantic Methods (delegate to self.logger) ────────────────
+    
+    def info(self, msg: str):
+        """General info message (INFO level)."""
+        self.logger.info(msg)
+    
+    def debug(self, msg: str):
+        """Debug message (DEBUG level)."""
+        self.logger.debug(msg)
+    
+    def warning(self, msg: str):
+        """Warning message (WARNING level)."""
+        self.logger.warning(f"⚠️  {msg}")
+    
+    def error(self, msg: str):
+        """Error message (ERROR level)."""
+        self.logger.error(f"❌ {msg}")
+    
+    def success(self, msg: str):
+        """Success message (INFO level)."""
+        self.logger.info(f"✅ {msg}")
+    
+    def section(self, title: str):
+        """Section header with dividers."""
+        self.logger.info(f"\n{'='*60}")
+        self.logger.info(title)
+        self.logger.info(f"{'='*60}")
+    
+    def subsection(self, title: str):
+        """Subsection header with smaller dividers."""
+        self.logger.info(f"\n{'─'*60}")
+        self.logger.info(title)
+        self.logger.info(f"{'─'*60}")
+    
+    def detail(self, msg: str):
+        """Indented detail message."""
+        self.logger.info(f"   {msg}")
+    
+    def debug_json(self, title: str, data: dict):
+        """Debug JSON block (DEBUG level)."""
+        import json
+        self.logger.debug(f"\n{'='*70}")
+        self.logger.debug(f"🔍 DEBUG: {title}")
+        self.logger.debug(f"{'='*70}")
+        self.logger.debug(json.dumps(data, indent=2, default=str))
+        self.logger.debug(f"{'='*70}\n")

@@ -1,26 +1,14 @@
-"""
-Main orchestration pipeline for projection risk alerts.
-
-This is the primary entry point for running the full pipeline:
-1. Fetch upcoming fixtures from BigQuery projections
-2. Update rosters for each team in each fixture
-3. Run the agentic pipeline to generate alerts
-4. Save alerts to the database
-5. Enrich projections with alerts and push to BigQuery
-
-Usage:
-    make pipeline
-    make pipeline-dry-run
-    make pipeline-fixtures
-"""
-
 import asyncio
 from datetime import datetime
 from typing import Optional
 import uuid
-from dotenv import load_dotenv  # noqa: E402
+
+from dotenv import load_dotenv
+
 load_dotenv()
 
+from src.utils.run_id import get_run_id  # noqa: E402
+from src.logging import get_logger  # noqa: E402
 from bigquery import ProjectionsService  # noqa: E402
 from src.services.roster_update import RosterUpdateService  # noqa: E402
 from src.services.agent_pipeline import AgentPipeline  # noqa: E402
@@ -48,13 +36,15 @@ class ProjectionAlertPipeline:
         if not self.config:
             raise ValueError("Config file not found")
         
-        self.run_id = str(uuid.uuid4())
-        print(f"Run ID: {self.run_id}")
+        self.run_id = get_run_id()
+        self.logger = get_logger()
+        self.logger.info(f"Run ID: {self.run_id}")
             
         self.dry_run = self.config.dry_run
         self.leagues = self.config.leagues
         self.push_all = self.config.push_all
         self.fixtures_only = self.config.fixtures_only
+        self.verbose = self.config.verbose
 
         self.projections_service = ProjectionsService()
         self.roster_update_service = RosterUpdateService()

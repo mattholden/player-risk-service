@@ -30,19 +30,12 @@ class AnalystAgent:
         """
         Analyze injury news and determine the impact on a team's performance.
         """
-        print(f"\n🔍 Anaylzing Fixture: {context.fixture}")
-        print(f"   Fixture: {context.fixture}")
-        print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
-        print(f"   Team: {context.team}")
-        print(f"   Opponent: {context.opponent}")
 
         # Build the search prompt
         user_message = self._build_user_message(injury_news, context)
+        self.logger.agent_user_message("Analyst Agent", user_message)
         system_message = self._build_system_message()
-        print("System message:")
-        print(system_message)
-        print("User message:")
-        print(user_message)
+        self.logger.agent_system_message("Analyst Agent", system_message)
         messages = [system_message, user_message]
 
         try:

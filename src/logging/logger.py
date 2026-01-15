@@ -1,8 +1,14 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from src.utils.run_id import get_run_id
+from config.pipeline_config import PipelineConfig
+import json
+from datetime import datetime
+
+if TYPE_CHECKING:
+    from src.agents.models import TeamContext
 
 _logger_instance: Optional['PipelineLogger'] = None
 
@@ -19,7 +25,8 @@ class PipelineLogger:
     
     def __init__(self):
         self.run_id = get_run_id()
-        
+        self.config = PipelineConfig.from_file()
+
         self.logger = logging.getLogger(f"{self.run_id}")
         self.logger.setLevel(logging.DEBUG)
         self.logger.handlers.clear()
@@ -29,7 +36,10 @@ class PipelineLogger:
         log_dir.mkdir(exist_ok=True)
         self.log_file = log_dir / f"{self.run_id}.log"
         file_handler = logging.FileHandler(self.log_file)
-        file_handler.setLevel(logging.DEBUG)  # File gets ALL messages
+        if self.config.verbose:
+            file_handler.setLevel(logging.DEBUG)
+        else:
+            file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(file_handler)
         
@@ -76,6 +86,18 @@ class PipelineLogger:
     def detail(self, msg: str):
         """Indented detail message."""
         self.logger.info(f"   {msg}")
+
+    def fixture_debug(self, msg: str, fixture: dict):
+        """Fixture debug message."""
+        self.logger.debug(f"[{fixture}] {msg}")
+
+    def fixture_info(self, msg: str, fixture: dict):
+        """Fixture detail message."""
+        self.logger.info(f"[{fixture}] {msg}")
+
+    def fixture_warning(self, msg: str, fixture: dict):
+        """Fixture warning message."""
+        self.logger.warning(f"[{fixture}] {msg}")
     
     def debug_json(self, title: str, data: dict):
         """Debug JSON block (DEBUG level)."""
@@ -85,6 +107,24 @@ class PipelineLogger:
         self.logger.debug(f"{'='*70}")
         self.logger.debug(json.dumps(data, indent=2, default=str))
         self.logger.debug(f"{'='*70}\n")
+
+    def pipeline_start(self):
+        """Log the start of the pipeline."""
+        msg = f"""
+PROJECTION ALERT PIPELINE STARTED
+
+Run ID: {self.run_id}
+Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Config:
+Leagues: {self.config.leagues}
+Fixtures: {self.config.fixtures}
+Fixtures only: {self.config.fixtures_only}
+Push all: {self.config.push_all}
+Verbose: {self.config.verbose}
+Dry run: {self.config.dry_run}
+        """
+        self.section(msg)
 
     def pipeline_fixtures(self, fixtures: list[dict]):
         """Log the fixtures for the pipeline."""
@@ -98,3 +138,88 @@ class PipelineLogger:
             self.debug(f"   {i}. {f['fixture']} @ {f['match_time']} ({f['league']})")
 
         self.success("Fetching Fixtures Complete")
+
+    def reseach_agent_processing(self, context: 'TeamContext'):
+        self.subsection(f"""
+Research Agent Processing
+
+- Fixture: {context.fixture}
+- Date: {context.fixture_date.strftime('%B %d, %Y')}
+- Team: {context.team}
+- Opponent: {context.opponent}
+""")
+
+    def analyst_agent_processing(self, context: 'TeamContext'):
+        self.subsection(f"""
+Analyst Agent Processing
+
+- Fixture: {context.fixture}
+- Date: {context.fixture_date.strftime('%B %d, %Y')}
+- Team: {context.team}
+- Opponent: {context.opponent}
+""")
+
+    def shark_agent_processing(self, context: 'TeamContext'):
+        self.subsection(f"""
+Shark Agent Processing
+
+- Fixture: {context.fixture}
+- Date: {context.fixture_date.strftime('%B %d, %Y')}
+""")
+
+    def grok_client_tool_calls(
+        self,
+        research_turns: int, 
+        total_client_side_tool_calls: int, 
+        total_server_side_tool_calls: int):
+
+        self.debug(f"📊 Research Turn {research_turns}:")
+        self.debug(f"   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}")
+
+    def grok_response(self, agent:str, response: any):
+        """Grok response message."""
+        self.debug(f"🔍 DEBUG: {agent} Response")
+        try:
+            content_json = json.loads(response.get('content', '{}'))
+            self.debug("🔍 CONTENT:\n")
+            self.debug(json.dumps(content_json, indent=2, default=str))
+        except Exception as e:
+            self.error(f"Error parsing JSON response: {e}")
+            self.error(f"Raw content: {response.get('content', '')[:200]}...")
+
+    def agent_system_message(self, agent:str, message:str):
+        self.debug(f"🔍 {agent} System Message:")
+        self.debug(message)
+
+    def agent_user_message(self, agent:str, message:str):
+        self.debug(f"🔍 {agent} User Message:")
+        self.debug(message)
+
+#TODO: integrate into async
+class FixtureLogger:
+    """Logger for a single fixture."""
+    def __init__(self, fixture_data: dict):
+        self.fixture = fixture_data['fixture']
+        self.match_time = fixture_data['match_time']
+
+        global _logger_instance
+        if _logger_instance is None:
+            raise ValueError("PipelineLogger not initialized")
+
+        self.logger = get_logger()
+
+    def info(self, msg: str):
+        """Fixture info message."""
+        self.logger.info(f"[{self.fixture}] {msg}")
+
+    def debug(self, msg: str):
+        """Fixture debug message."""
+        self.logger.debug(f"[{self.fixture}] {msg}")
+
+    def warning(self, msg: str):
+        """Fixture warning message."""
+        self.logger.warning(f"[{self.fixture}] {msg}")
+
+    def error(self, msg: str):
+        """Fixture error message."""
+        self.logger.error(f"[{self.fixture}] {msg}")

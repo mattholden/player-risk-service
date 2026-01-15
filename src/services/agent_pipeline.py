@@ -58,8 +58,10 @@ class AgentPipeline:
         # Step 1 & 2: Run research and analyst for both teams
         team_analyses = []
         for context in contexts:
-            print(f"\n📊 Processing {context.team}...")
+            self.logger.reseach_agent_processing(context)
             research_response = self.research_agent.research_team(context).findings['description']
+            
+            self.logger.analyst_agent_processing(context)
             analyst_response = self.analyst_agent.analyze_injury_news(context, research_response)
             
             team_analyses.append({
@@ -68,8 +70,7 @@ class AgentPipeline:
                 'analyst': analyst_response
             })
         
-        # Step 3: Run shark ONCE with data from both teams
-        print(f"\n🦈 Running Shark Agent with combined fixture data...")
+        self.logger.shark_agent_processing(contexts[0])
         alerts = self.shark_agent.analyze_player_risk_for_fixture(team_analyses)
         
         return alerts

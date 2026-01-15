@@ -67,51 +67,17 @@ class ResearchAgent:
         Returns:
             InjuryResearchFindings with sources, key findings, and summary
         """
-        print(f"\n🔍 Researching: {context.team}")
-        print(f"   Fixture: {context.fixture}")
-        print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
         
         try:
-            # # ============================================================
-            # # PHASE 1: Get active roster using custom tool
-            # # ============================================================
-            # print("\n📋 Phase 1: Getting active roster...")
             
             tool_registry.clear()
             tool_registry.register(ActiveRosterTool())
             
-            # roster_messages = [
-            #     {"role": "system", "content": "Get the active roster for the requested team. Return ONLY the raw JSON from the tool, nothing else."},
-            #     {"role": "user", "content": f"Get the active roster for {context.team} in the Premier League."}
-            # ]
-            
-            # roster_response = self.grok_client.chat_with_tools(
-            #     messages=roster_messages,
-            #     tool_registry=tool_registry,
-            #     use_web_search=False,  # No native tools in phase 1
-            #     use_x_search=False,
-            #     verbose=True
-            # )
-            
-            # # Parse roster from response
-            # roster_content = roster_response.get('content', '{}')
-            # try:
-            #     roster_data = json.loads(roster_content)
-            #     players = roster_data.get('players', [])
-            #     player_names = [p.get('name', '') for p in players if p.get('name')]
-            #     print(f"   ✅ Found {len(player_names)} players")
-            # except json.JSONDecodeError:
-            #     print("   ⚠️  Could not parse roster, proceeding without player list")
-            #     player_names = []
-            
-            # ============================================================
-            # PHASE 2: Search for injuries using native tools
-            # ============================================================
-            print("\n🔍 Phase 2: Searching for injury news... WITH STREAMING")
-            
             # Build messages with roster context
             system_message = self._build_system_message()
+            self.logger.agent_system_message("Research Agent", system_message)
             user_message = self._build_user_message(context, lookback_days)
+            self.logger.agent_user_message("Research Agent", user_message)
             messages = [system_message, user_message]
             
             # Use chat_completion for native tools only (no custom tools)
@@ -122,32 +88,19 @@ class ResearchAgent:
                 use_x_search=True,
                 verbose=True
             )
-            
-            # Parse the JSON string into a dictionary
-            try:
-                content_json = json.loads(response.get('content', '{}'))
-                print("\n" + "="*70)
-                print("🔍 DEBUG: Parsed JSON Response (dict)")
-                print("="*70)
-                print(json.dumps(content_json, indent=2))
-                print("="*70 + "\n")
-            except json.JSONDecodeError as e:
-                print(f"⚠️  Failed to parse JSON response: {e}")
-                print(f"   Raw content: {response.get('content', '')[:200]}...")
-                content_json = {}
+
+            self.logger.grok_response("Research Agent", response)
             
             return InjuryResearchFindings(
                 team_name=context.team,
                 fixture=context.fixture,
-                findings=content_json,
+                findings=json.loads(response.get('content', '{}')),
                 sources=response.get('sources', []),
                 search_timestamp=datetime.now()
             )
             
         except Exception as e:
-            print(f"❌ Research failed: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.error(f"Research Agent Failed: {e}")
             # Return empty findings on error
             return InjuryResearchFindings(
                 team_name=context.team,

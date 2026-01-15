@@ -16,7 +16,6 @@ from database.services import AlertService  # noqa: E402
 from config.pipeline_config import PipelineConfig  # noqa: E402
 from database.models.alert import Alert  # noqa: E402
 
-
 class ProjectionAlertPipeline:
     """
     Main orchestrator for the projection risk alert pipeline.
@@ -38,10 +37,11 @@ class ProjectionAlertPipeline:
         
         self.run_id = get_run_id()
         self.logger = get_logger()
-        self.logger.section(f"\nRun ID: {self.run_id}\n")
+        self.logger.pipeline_start()
             
         self.dry_run = self.config.dry_run
         self.leagues = self.config.leagues
+        self.fixtures = self.config.fixtures
         self.push_all = self.config.push_all
         self.fixtures_only = self.config.fixtures_only
         self.verbose = self.config.verbose
@@ -73,37 +73,18 @@ class ProjectionAlertPipeline:
                 if any(league.lower() in f['league'].lower() for league in self.leagues)
             ]
 
+        if self.fixtures:
+            fixtures = [
+                f for f in fixtures 
+                if f['fixture'] in self.fixtures
+            ]
+
         self.logger.pipeline_fixtures(fixtures)
         
         if not fixtures:
             return []
         
-        return fixtures
-    
-    # =========================================================================
-    # Step 2-3: Update Rosters
-    # =========================================================================
-    
-    async def update_rosters_for_fixture(self, fixture: str) -> bool:
-        """
-        Update rosters for both teams in a fixture.
-        
-        Failures are logged but don't stop the pipeline - the agent has
-        contingencies to find roster info from online sources.
-        
-        Args:
-            fixture: Fixture string (e.g., "Arsenal vs Brentford")
-            
-        Returns:
-            bool: True if at least one roster was updated successfully
-        """
-        print(f"\n🔄 Updating rosters for: {fixture}")
-        
-        results = await self.roster_update_service.update_fixture_rosters(fixture)
-        
-        # Return True if at least one team updated successfully
-        successes = sum(1 for r in results if r.success)
-        return successes > 0
+        return fixtures 
     
     # =========================================================================
     # Step 4-5: Run Agent Pipeline
@@ -120,7 +101,7 @@ class ProjectionAlertPipeline:
         Returns:
             list: Generated PlayerAlert objects
         """
-        print(f"\n🤖 Running agents for: {fixture}")
+        self.logger.fixture_info("Running agent pipeline", fixture)
         
         # Parse match_time string to datetime
         try:
@@ -134,7 +115,7 @@ class ProjectionAlertPipeline:
                 fixture_date = datetime.strptime(match_time, "%Y-%m-%d")
                 fixture_date = fixture_date.replace(hour=12, minute=0)
         except ValueError as e:
-            print(f"   ⚠️  Could not parse match_time '{match_time}': {e}")
+            self.logger.fixture_warning(f"Could not parse match_time '{match_time}': {e}", fixture)
             fixture_date = datetime.now()
         
         # Run the agent pipeline
@@ -247,39 +228,25 @@ class ProjectionAlertPipeline:
             fixtures: Optional list of fixtures to process. If not provided,
                      fetches from BigQuery.
         """
-        start_time = datetime.now()
-        
-        print("\n" + "="*60)
-        print("🚀 PROJECTION ALERT PIPELINE")
-        print("="*60)
-        print(f"   Started: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   Dry run: {self.dry_run}")
         
         # Step 1: Get fixtures
         if fixtures is None:
             fixtures = self.get_fixtures()
         
         if not fixtures:
-            print("\n❌ No fixtures to process. Exiting.")
+            self.logger.error("No fixtures to process. Exiting.")
             return
         
-        # Steps 2-5: Process each fixture
-        print("\n" + "="*60)
-        print("⚙️  PROCESSING FIXTURES")
-        print("="*60)
+        self.logger.section("PROCESSING FIXTURES")
         
         all_alerts = []
         for i, fixture_data in enumerate(fixtures, 1):
             fixture = fixture_data['fixture']
             match_time = fixture_data['match_time']
             
-            print(f"\n{'─'*60}")
-            print(f"📍 Fixture {i}/{len(fixtures)}: {fixture}")
-            print(f"   Match time: {match_time}")
-            print(f"{'─'*60}")
-            
+            # Removing roster update from pipeline TODO: Separate Logging for Roster Updates
             # # Step 2-3: Update rosters
-            # await self.update_rosters_for_fixture(fixture)
+            # await self.roster_update_service.update_fixture_rosters(fixture)
             
             # Step 4-5: Run agents
             alerts = self.run_agents_for_fixture(fixture, match_time)
@@ -298,19 +265,16 @@ class ProjectionAlertPipeline:
         else:
             print("\n🔒 Dry run - skipping BigQuery write")
         
-        # Summary
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
         
-        print("\n" + "="*60)
-        print("✅ PIPELINE COMPLETE")
-        print(f"   Run ID: {self.run_id}")
-        print("="*60)
-        print(f"   Fixtures processed: {len(fixtures)}")
-        print(f"   Alerts generated: {len(all_alerts)}")
-        print(f"   Projections enriched: {enriched_count}")
-        print(f"   Duration: {duration:.1f} seconds")
-        print(f"   Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        # print("\n" + "="*60)
+        # print("✅ PIPELINE COMPLETE")
+        # print(f"   Run ID: {self.run_id}")
+        # print("="*60)
+        # print(f"   Fixtures processed: {len(fixtures)}")
+        # print(f"   Alerts generated: {len(all_alerts)}")
+        # print(f"   Projections enriched: {enriched_count}")
+        # print(f"   Duration: {duration:.1f} seconds")
+        # print(f"   Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     def run(self, fixtures: Optional[list[dict]] = None) -> None:
         """

@@ -191,7 +191,6 @@ class RosterUpdateService:
         
         try:
             # 1. Scrape roster from Transfermarkt
-            print(f"\n🔄 Updating {team.team_name} ({team.league})...")
             players = await self.scraper.get_squad(
                 team_slug=team.transfermarkt_slug,
                 team_id=team.transfermarkt_id
@@ -330,11 +329,13 @@ class RosterUpdateService:
         Returns:
             List of UpdateResult for each team (0-2 results depending on success)
         """
+        self.logger.fixture_detail("Updating rosters", fixture)
+
         results = []
         
         # Parse fixture into team names
         if " vs " not in fixture:
-            print(f"⚠️  Invalid fixture format: {fixture}")
+            self.logger.fixture_warning("Invalid fixture format for updating rosters", fixture)
             return results
         
         teams = [t.strip() for t in fixture.split(" vs ")]

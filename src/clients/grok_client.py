@@ -195,7 +195,7 @@ class GrokClient:
             return self._parse_response(response)
             
         except Exception as e:
-            print(f"❌ Grok API error: {e}")
+            self.logger.error(f"Grok API error: {e}")
             raise
     
     def chat_with_tools(
@@ -390,9 +390,6 @@ class GrokClient:
             custom_tools = tool_registry.get_all_client_side_tools()
             custom_tools_names = tool_registry.get_tool_names()
             tools.extend(custom_tools)
-            if verbose:
-                print(f"   🔧 Loaded {len(custom_tools)} custom tools: {tool_registry.get_tool_names()}")
-                print(f"   🔧 Custom tools: {custom_tools}\n\n")
 
         chat = self.client.chat.create(
             model=model,
@@ -417,10 +414,6 @@ class GrokClient:
             research_turns += 1
             client_side_tool_calls = []
             
-            # Print turn header
-            print(f"\n📊 Research Turn {research_turns}:")
-            print("   Client: 0 | Server: 0", end="", flush=True)
-            
             for response, chunk in chat.stream():
                 for tool_call in chunk.tool_calls:
                     tool_type = get_tool_call_type(tool_call)
@@ -430,27 +423,24 @@ class GrokClient:
                     else:
                         total_server_side_tool_calls += 1
                     
-                    # Update the counts in-place using \r
-                    print(f"\r   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}", end="", flush=True)
-                    
-            # Finish the line after streaming completes
-            print()  # Move to new line
+            self.logger.grok_client_tool_calls(research_turns, total_client_side_tool_calls, total_server_side_tool_calls)
+            
             chat.append(response)
             
             # If no client-side tools were called, we're done
             if not client_side_tool_calls:
-                print("   ✅ Complete (no client-side tools needed)")
+                self.logger.success("Grok Streaming Complete")
                 break
             
             # Execute your custom tools and add results
-            print(f"   🔧 Executing {len(client_side_tool_calls)} client-side tool(s):")
+            self.logger.debug(f"Executing {len(client_side_tool_calls)} client-side tool(s):")
             for tool_call in client_side_tool_calls:
-                print(f"      → {tool_call.function.name}")
+                self.logger.debug(f"      → {tool_call.function.name}")
                 if tool_call.function.name in custom_tools_names:
                     result = tool_registry.execute(tool_call.function.name, json.loads(tool_call.function.arguments))
                     chat.append(tool_result(result))
                 else:
-                    print(f"      ⚠️  Unknown tool: {tool_call.function.name}")
+                    self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
             
 

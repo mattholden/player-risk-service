@@ -4,5 +4,5 @@
     "dry_run": true,
     "fixtures_only": false,
     "push_all": true,
-    "verbose": true
+    "verbose": false
 }

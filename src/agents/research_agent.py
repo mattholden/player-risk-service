@@ -155,30 +155,7 @@ Return your findings in the JSON format specified in the system instructions.
         Args:
             player_names: Optional list of player names from the roster
         """
-        # Build roster section if players available
-        
-        # current_date = datetime.now().strftime("%B %d, %Y")
-#         roster_section = ""
-#         if player_names:
-#             roster_section = f"""
-# ACTIVE ROSTER ({len(player_names)} players):
-# {', '.join(player_names)}
 
-# Only report injury news for players on this roster. Ignore news about players not listed above.
-# """
-#         else:
-#             roster_section = f"""
-# Note: Report injury news for the team's known players.
-# Always verify squad rosters as of {current_date}.
-
-# **Trusted Squad Roster Sources (in priority order):**
-# 1. Trusted Sportsgambler Lineup website: https://www.sportsgambler.com/lineups/football/
-# 2. Official club websites (e.g., arsenal.com/first-team, brentfordfc.com/players)
-# 3. Trusted Soccerway website: https://us.soccerway.com/
-# 4. Transfermarkt.com (most up-to-date transfer database)
-# 5. BBC Sport squad pages
-# 6. Sky Sports squad lists
-# """
 
         prompt = """You are a thorough and curious sports injury research assistant for the 2025/2026 football season. 
 Integrity is important so you will read as many sources as possible and spend as much time as needed to find the latest news and information.

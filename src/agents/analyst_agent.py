@@ -6,19 +6,22 @@ import re
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, Source, TeamAnalysis
 from src.logging import get_logger
-
+from prompts.base import AgentPrompt
+from src.utils.strict_prompting import strict_format
 class AnalystAgent:
     """
     Agent that analyzes injury news and determines the impact on a team's performance.
     """
-    def __init__(self, grok_client: GrokClient):
+    def __init__(self, grok_client: GrokClient, prompts: AgentPrompt):
         """
         Initialize Analyst Agent.
         
         Args:
             grok_client: Initialized GrokClient instance
+            prompts: AgentPrompt instance
         """
         self.grok_client = grok_client
+        self.prompts = prompts
         self.logger = get_logger()
         self.logger.success("Analyst Agent Initialized")
 

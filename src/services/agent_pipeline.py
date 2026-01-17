@@ -7,20 +7,36 @@ from datetime import datetime
 from typing import List
 from database import AlertService
 from src.logging import get_logger
+from prompts import get_sport_config  # noqa: E402
 class AgentPipeline:
     """
     Pipeline that orchestrates the agents.
     """
-    def __init__(self, run_id: str):
+    def __init__(self, run_id: str, sport: str):
         """
         Initialize the pipeline.
         """
+        self.sport = sport
         self.run_id = run_id
         self.logger = get_logger()
         self.grok_client = GrokClient()
-        self.analyst_agent = AnalystAgent(self.grok_client)
-        self.shark_agent = SharkAgent(self.grok_client)
-        self.research_agent = ResearchAgent(self.grok_client)
+        self.sport_config = get_sport_config(self.sport)
+
+        self.analyst_agent = AnalystAgent(
+            grok_client=self.grok_client, 
+            prompts=self.sport_config.analyst
+        )
+
+        self.shark_agent = SharkAgent(
+            grok_client=self.grok_client, 
+            prompts=self.sport_config.shark
+        )
+
+        self.research_agent = ResearchAgent(
+            grok_client=self.grok_client, 
+            prompts=self.sport_config.research
+        )
+
         self.alert_service = AlertService(run_id=self.run_id)
         self.logger.success("Agent Pipeline Initialized")
 

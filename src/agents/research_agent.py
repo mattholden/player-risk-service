@@ -19,7 +19,7 @@ from src.clients.grok_client import GrokClient
 from src.agents.models import InjuryResearchFindings, TeamContext
 from src.tools import tool_registry, ActiveRosterTool
 from src.logging import get_logger
-
+from prompts.base import AgentPrompt
 class ResearchAgent:
     """
     Agent that researches player injury status using Grok's search capabilities.
@@ -37,14 +37,16 @@ class ResearchAgent:
         findings = agent.research_player(context)
     """
     
-    def __init__(self, grok_client: GrokClient):
+    def __init__(self, grok_client: GrokClient, prompts: AgentPrompt):
         """
         Initialize Research Agent.
         
         Args:
             grok_client: Initialized GrokClient instance
+            prompts: AgentPrompt instance
         """
         self.grok_client = grok_client
+        self.prompts = prompts
         self.logger = get_logger()
         self.logger.success("Research Agent Initialized")
     

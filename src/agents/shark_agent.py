@@ -6,15 +6,21 @@ from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, PlayerAlert
 from database.enums import AlertLevel
 from src.logging import get_logger
+from prompts.base import AgentPrompt
 class SharkAgent:
     """
     Agent that uses the Shark API to get the latest news and information about a team.
     """
-    def __init__(self, grok_client: GrokClient):
+    def __init__(self, grok_client: GrokClient, prompts: AgentPrompt):
         """
         Initialize Shark Agent.
+
+        Args:
+            grok_client: Initialized GrokClient instance
+            prompts: AgentPrompt instance
         """
         self.grok_client = grok_client
+        self.prompts = prompts
         self.logger = get_logger()
         self.logger.success("Shark Agent Initialized")
 

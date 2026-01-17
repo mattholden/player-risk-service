@@ -15,7 +15,7 @@ from src.services.agent_pipeline import AgentPipeline  # noqa: E402
 from database.services import AlertService  # noqa: E402
 from config.pipeline_config import PipelineConfig  # noqa: E402
 from database.models.alert import Alert  # noqa: E402
-
+from prompts import get_sport_config  # noqa: E402
 class ProjectionAlertPipeline:
     """
     Main orchestrator for the projection risk alert pipeline.
@@ -38,7 +38,9 @@ class ProjectionAlertPipeline:
         self.run_id = get_run_id()
         self.logger = get_logger()
         self.logger.pipeline_start()
-            
+        
+        # Load sport-specific prompts
+        self.sport = self.config.sport
         self.dry_run = self.config.dry_run
         self.leagues = self.config.leagues
         self.fixtures = self.config.fixtures
@@ -48,7 +50,7 @@ class ProjectionAlertPipeline:
 
         self.projections_service = ProjectionsService()
         self.roster_update_service = RosterUpdateService()
-        self.agent_pipeline = AgentPipeline(self.run_id)
+        self.agent_pipeline = AgentPipeline(self.run_id, self.sport)
         self.logger.success("Projection Alert Pipeline Initialized")
     
     # =========================================================================

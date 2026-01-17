@@ -35,10 +35,20 @@ class AnalystAgent:
         """
 
         # Build the search prompt
-        user_message = self._build_user_message(injury_news, context)
-        self.logger.agent_user_message("Analyst Agent", user_message)
-        system_message = self._build_system_message()
-        self.logger.agent_system_message("Analyst Agent", system_message)
+        # user_message = self._build_user_message(injury_news, context)
+        # self.logger.agent_user_message("Analyst Agent", user_message)
+        # system_message = self._build_system_message()
+        # self.logger.agent_system_message("Analyst Agent", system_message)
+
+        ###### Building prompts from prompt registry
+        ###### *****If truly making it sport agnostic then parameters have to be extracted specifically based on the soccer user template
+        user_message = self.prompts.generate_user_prompt(
+            context=context, 
+            injury_news=injury_news
+        )
+        
+        system_message = self.prompts.generate_system_prompt()
+        
         messages = [system_message, user_message]
 
         try:

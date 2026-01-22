@@ -194,6 +194,7 @@ class ProjectionAlertPipeline:
         
         # Run enrichment
         self.enrich_and_push_projections(fixture_names, alerts)
+        self.logger.pipeline_complete(fixtures, alerts)
     
     # =========================================================================
     # Main Run Method

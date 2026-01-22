@@ -10,6 +10,7 @@ from typing import Optional
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import pandas as pd
+from src.logging import get_logger
 
 
 class BigQueryClient:
@@ -41,12 +42,14 @@ class BigQueryClient:
         self.credentials_path = credentials_path or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         
         if not self.project_id:
+            self.logger.error("BigQuery project ID is required. Set BIGQUERY_PROJECT_ID environment variable or pass project_id parameter.")
             raise ValueError(
                 "BigQuery project ID is required. "
                 "Set BIGQUERY_PROJECT_ID environment variable or pass project_id parameter."
             )
         
         self._client: Optional[bigquery.Client] = None
+        self.logger = get_logger()
     
     @property
     def client(self) -> bigquery.Client:
@@ -92,6 +95,7 @@ class BigQueryClient:
         Returns:
             pd.DataFrame: Query results
         """
+        self.logger.debug(f"Executing query: {sql}")
         query_job = self.client.query(sql)
         return query_job.to_dataframe()
     

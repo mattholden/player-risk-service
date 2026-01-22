@@ -46,7 +46,9 @@ class SharkAgent:
             return []
         
         user_message = self._build_fixture_user_message(team_analyses)
+        self.logger.agent_user_message("Shark Agent", user_message)
         system_message = self._build_system_message()
+        self.logger.agent_system_message("Shark Agent", system_message)
         messages = [system_message, user_message]
         
         response = self.grok_client.chat_with_streaming(
@@ -75,7 +77,9 @@ class SharkAgent:
         """
 
         user_message = self._build_user_message(context, injury_news, expert_analysis)
+        self.logger.agent_user_message("Shark Agent", user_message)
         system_message = self._build_system_message()
+        self.logger.agent_system_message("Shark Agent", system_message)
         messages = [system_message, user_message]
         response = self.grok_client.chat_with_streaming(
             messages=messages,

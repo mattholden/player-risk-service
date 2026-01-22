@@ -177,18 +177,17 @@ class ProjectionsService:
         
         # Build IN clause for fixtures
         fixtures_str = ", ".join([self._escape_quotes(f) for f in fixtures])
-        print(f"DEBUG fixtures_str: {fixtures_str}") #######
+        self.logger.debug(f"DEBUG fixtures_str: {fixtures_str}") #######
         query = f"""
             SELECT * 
             FROM `{self.source_table_id}`
             WHERE {fixture_column} IN ({fixtures_str})
-            AND match_time > '{self.today}'
+            AND match_time > '{self.specific_date}'
         """
-        print(f"DEBUG full query:\n{query}")  # Add this
-        
-        print(f"📊 Fetching projections for {len(fixtures)} fixtures...")
+        self.logger.info(f"📊 Fetching projections for {len(fixtures)} fixtures...")
         df = self.client.query(query)
-        print(f"   Found {len(df)} total projection rows")
+        self.logger.info(f"   Found {len(df)} total projection rows")
+        self.logger.projection_summary(df, player_name_column)
         
         return df
     

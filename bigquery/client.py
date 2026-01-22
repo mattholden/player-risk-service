@@ -129,6 +129,7 @@ class BigQueryClient:
             schema: Optional explicit schema (list of bigquery.SchemaField)
             allow_schema_updates: If True, allow new fields to be added to table schema
         """
+        self.logger.info(f"Writing {len(df)} rows to {table_id}...")
         job_config = bigquery.LoadJobConfig(
             write_disposition=write_disposition,
         )
@@ -151,7 +152,7 @@ class BigQueryClient:
         # Wait for the job to complete
         job.result()
         
-        print(f"✅ Wrote {len(df)} rows to {table_id}")
+        self.logger.success(f"Wrote {len(df)} rows to {table_id}")
     
     def table_exists(self, table_id: str) -> bool:
         """

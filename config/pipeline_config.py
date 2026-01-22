@@ -12,7 +12,7 @@ class PipelineConfig:
     push_all: bool = True
     verbose: bool = False
     fixtures: list[str] | None = None
-    
+    sport: str = "soccer"
     @classmethod
     def from_file(cls, path: str | Path = "config/pipeline_config.json") -> "PipelineConfig":
         """Load config from a JSON file."""

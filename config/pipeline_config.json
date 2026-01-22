@@ -1,8 +1,9 @@
 {
     "leagues": ["Premier League", "Bundesliga", "Primera División"],
     "fixtures": ["Werder Bremen vs Eintracht Frankfurt"],
-    "dry_run": true,
+    "dry_run": false,
     "fixtures_only": false,
     "push_all": true,
-    "verbose": false
+    "verbose": true,
+    "sport": "soccer"
 }

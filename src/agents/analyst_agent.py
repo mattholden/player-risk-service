@@ -35,36 +35,35 @@ class AnalystAgent:
         """
 
         # Build the search prompt
-        # user_message = self._build_user_message(injury_news, context)
-        # self.logger.agent_user_message("Analyst Agent", user_message)
-        # system_message = self._build_system_message()
-        # self.logger.agent_system_message("Analyst Agent", system_message)
+        user_message = self._build_user_message(injury_news, context)
+        self.logger.agent_user_message("Analyst Agent", user_message)
+        system_message = self._build_system_message()
+        self.logger.agent_system_message("Analyst Agent", system_message)
 
         ###### Building prompts from prompt registry
         ###### *****If truly making it sport agnostic then parameters have to be extracted specifically based on the soccer user template
-        user_message = self.prompts.generate_user_prompt(
-            context=context, 
-            injury_news=injury_news
-        )
+        # user_message = self.prompts.user_prompt_template(
+        #     context=context, 
+        #     injury_news=injury_news
+        # )
+        # self.logger.agent_user_message("Analyst Agent", user_message)
         
-        system_message = self.prompts.generate_system_prompt()
-        
+        # system_message = self.prompts.system_prompt_template()
+        # self.logger.agent_system_message("Analyst Agent", system_message)
+
         messages = [system_message, user_message]
 
         try:
-            response = self.grok_client.chat_completion(
+            response = self.grok_client.chat_with_streaming(
                 messages=messages,
+                tool_registry=None, ## Switch to roster tool registry when it's fixed
                 use_web_search=True,
                 use_x_search=True,
-                return_citations=True,
+                verbose=True
             )
-            print("\n" + "="*70)
-            print("🔍 DEBUG: Raw Grok Response")
-            print("="*70)
-            print(response.get('content', ''))
-            print("="*70 + "\n")
+            self.logger.grok_response("Analyst Agent", response)
         except Exception as e:
-            print(f"❌ Analysis failed: {e}")
+            self.logger.error(f"Analyst Agent Failed: {e}")
             return None
         
         return TeamAnalysis(

@@ -51,9 +51,11 @@ class AlertService:
             int: Number of alerts saved
         """
         if not alerts:
+            self.logger.warning("No alerts to save in Alert Service")
             return 0
         
-        print(f"\n💾 Saving {len(alerts)} alerts to database...")
+        self.logger.info(f"Saving {len(alerts)} alerts to database...")
+        self.logger.alert_service_alerts(alerts)
         
         with session_scope() as session:
             saved_count = 0
@@ -73,7 +75,7 @@ class AlertService:
                 session.add(db_alert)
                 saved_count += 1
         
-        print(f"✅ Saved {saved_count} player alerts to database")
+        self.logger.success(f"Saved {saved_count} player alerts to database")
         return saved_count
     
     def get_alerts_for_fixture(self, fixture: str) -> List[Alert]:

@@ -42,35 +42,22 @@ class SharkAgent:
             List of PlayerAlert objects (no duplicates)
         """
         if not team_analyses:
+            self.logger.error("No team analyses provided for Shark Agent")
             return []
-        
-        # Extract fixture info from first context
-        fixture = team_analyses[0]['context'].fixture
-        fixture_date = team_analyses[0]['context'].fixture_date
-        
-        print(f"\n🦈 Analyzing Fixture Risk: {fixture}")
-        print(f"   Date: {fixture_date.strftime('%B %d, %Y')}")
-        print(f"   Processing {len(team_analyses)} teams together (prevents duplicates)")
         
         user_message = self._build_fixture_user_message(team_analyses)
         system_message = self._build_system_message()
         messages = [system_message, user_message]
         
-        response = self.grok_client.chat_completion(
+        response = self.grok_client.chat_with_streaming(
             messages=messages,
+            tool_registry=None, ## Switch to roster tool registry when it's fixed
             use_web_search=True,
             use_x_search=True,
-            return_citations=True,
+            verbose=True
         )
-        content = response.get('content', '')
-        print("\n" + "="*70)
-        print("🔍 DEBUG: Raw Shark Response")
-        print("="*70)
-        print(content)
-        print("="*70 + "\n")
-        
-        # Parse the response using the first context for fixture info
-        return self._parse_response(content, team_analyses[0]['context'])
+        self.logger.grok_response("Shark Agent", response)
+        return self._parse_response(response.get('content', ''), team_analyses[0]['context'])
     
     def analyze_player_risk(
         self, 
@@ -86,30 +73,19 @@ class SharkAgent:
         Returns:
             List of PlayerAlert objects with alert levels and descriptions
         """
-        print(f"\n🔍 Analyzing Risk for {context.team}")
-        print(f"   Fixture: {context.fixture}")
-        print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
-        print(f"   Team: {context.team}")
-        print(f"   Opponent: {context.opponent}")
 
         user_message = self._build_user_message(context, injury_news, expert_analysis)
         system_message = self._build_system_message()
         messages = [system_message, user_message]
-        response = self.grok_client.chat_completion(
+        response = self.grok_client.chat_with_streaming(
             messages=messages,
+            tool_registry=None, ## Switch to roster tool registry when it's fixed
             use_web_search=True,
             use_x_search=True,
-            return_citations=True,
+            verbose=True
         )
-        content = response.get('content', '')
-        print("\n" + "="*70)
-        print("🔍 DEBUG: Raw Shark Response")
-        print("="*70)
-        print(content)
-        print("="*70 + "\n")
-        
-        # Parse the response into PlayerAlert objects
-        return self._parse_response(content, context)
+        self.logger.grok_response("Shark Agent", response)
+        return self._parse_response(response.get('content', ''), context)
 
     def _build_fixture_user_message(self, team_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -354,7 +330,7 @@ Do not include players with no edge potential. Empty array if no opportunities e
                 )
                 alerts.append(alert)
             
-            print(f"\n✅ Parsed {len(alerts)} player alerts")
+            self.logger.success(f"Parsed {len(alerts)} player alerts")
             return alerts
             
         except json.JSONDecodeError as e:

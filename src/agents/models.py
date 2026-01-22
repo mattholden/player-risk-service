@@ -196,3 +196,40 @@ class PlayerAlert(BaseModel):
                 "description": "Jack Currie is ruled out for the next 2 weeks"
             }
         }
+
+class TeamData(BaseModel):
+    """
+    Data for a single team analysis (two per fixture/match).
+    """
+    team_a: str = Field(..., description="Team A being analyzed")
+    team_b: str = Field(..., description="Team B being analyzed")
+    injury_news: Optional[str] = Field(default=None, description="Injury news from research agent")
+    analyst_report: Optional[str] = Field(default=None, description="Report from analyst agent")
+    
+#TODO: HOW DO WE MAKE THIS SPORTS AGNOSTIC?
+class AgentData(BaseModel):
+    """
+    Data for the agent pipeline. Fields populated progressively.
+    """
+    # Required at creation (from fixture data)
+    fixture: str = Field(..., description="Fixture string e.g. 'Arsenal vs Brentford'")
+    match_time: datetime = Field(..., description="Parsed match datetime")
+    
+    # Optional - populated later
+    team_contexts: Optional[List['TeamContext']] = Field(default=None, description="List of team contexts")
+    current_date: datetime = Field(default_factory=datetime.now, description="Current date")
+    lookback_days: int = Field(default=14, description="Number of days to look back")
+    lookback_date: Optional[datetime] = Field(default=None, description="Calculated lookback date")
+    injury_news: Optional[str] = Field(default=None, description="Injury news from research agent")
+    analyst_report: Optional[str] = Field(default=None, description="Report from analyst agent")
+
+class AnalystPromptPlaceholders(BaseModel):
+    """
+    Placeholders for the prompt templates
+    """
+    fixture: str = Field(..., description="Fixture being analyzed")
+    fixture_date: datetime = Field(..., description="Date and time of the fixture")
+    team: str = Field(..., description="Team being analyzed")
+    opponent: str = Field(..., description="Opponent team being analyzed")
+    current_date: datetime = Field(..., description="Current date")
+    injury_news: str = Field(..., description="Injury news")

@@ -3,13 +3,15 @@ import os
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 from src.utils.run_id import get_run_id
+from src.utils.timedelta_format import format_timedelta
 from config.pipeline_config import PipelineConfig
 import json
 from datetime import datetime
+import pandas as pd
 
 if TYPE_CHECKING:
     from src.agents.models import TeamContext
-
+    from src.agents.models import PlayerAlert
 _logger_instance: Optional['PipelineLogger'] = None
 
 def get_logger() -> 'PipelineLogger':
@@ -48,6 +50,12 @@ class PipelineLogger:
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(console_handler)
+
+        self.projections_count: int = 0
+        self.matched_count: int = 0
+        self.unmatched_count: int = 0
+        self.start_time: datetime = None
+        self.end_time: datetime = None
     
     # ─── Semantic Methods (delegate to self.logger) ────────────────
     
@@ -110,11 +118,12 @@ class PipelineLogger:
 
     def pipeline_start(self):
         """Log the start of the pipeline."""
+        self.start_time = datetime.now()
         msg = f"""
 PROJECTION ALERT PIPELINE STARTED
 
 Run ID: {self.run_id}
-Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Started: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}
 
 Config:
 Leagues: {self.config.leagues}
@@ -176,16 +185,37 @@ Shark Agent Processing
         self.debug(f"📊 Research Turn {research_turns}:")
         self.debug(f"   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}")
 
-    def grok_response(self, agent:str, response: any):
-        """Grok response message."""
+    def grok_response(self, agent: str, response):
+        """
+        Log Grok response. Handles dict, string (JSON or plain), list, or any type.
+        """
         self.debug(f"🔍 DEBUG: {agent} Response")
+        
         try:
-            content_json = json.loads(response.get('content', '{}'))
-            self.debug("🔍 CONTENT:\n")
-            self.debug(json.dumps(content_json, indent=2, default=str))
+            # Step 1: Extract content if response is dict-like
+            content = response
+            if hasattr(response, 'get'):  # Dict-like
+                content = response.get('content', response)
+            
+            # Step 2: Try to parse as JSON if it's a string
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Keep as string if not valid JSON
+            
+            # Step 3: Pretty print based on type
+            if isinstance(content, (dict, list)):
+                self.debug("🔍 CONTENT:\n")
+                self.debug(json.dumps(content, indent=2, default=str))
+            else:
+                # String or other type - just print it
+                self.debug(f"🔍 CONTENT:\n{content}")
+                
         except Exception as e:
-            self.error(f"Error parsing JSON response: {e}")
-            self.error(f"Raw content: {response.get('content', '')[:200]}...")
+            # Fallback: just str() whatever we got
+            self.error(f"Error formatting response: {e}")
+            self.debug(f"Raw response: {str(response)[:500]}")
 
     def agent_system_message(self, agent:str, message:str):
         self.debug(f"🔍 {agent} System Message:")
@@ -194,6 +224,69 @@ Shark Agent Processing
     def agent_user_message(self, agent:str, message:str):
         self.debug(f"🔍 {agent} User Message:")
         self.debug(message)
+
+    def alert_service_alerts(self, alerts: list['PlayerAlert']):
+        self.info(f"📋 Found {len(alerts)} alerts.")
+        for i, a in enumerate(alerts, 1):
+            self.debug(f"   {i}. {a.player_name} - {a.alert_level} - {a.description}")
+
+    def projection_summary(self, projections_df: 'pd.DataFrame', player_name_column: str = "player_name"):
+        """Debug log showing projection data - player names."""
+        self.projections_count += len(projections_df)
+        projection_players = sorted(projections_df[player_name_column].unique().tolist())
+        self.debug("Projection Summary:")
+        self.debug(f"   Total Projections: {self.projections_count}")
+        self.debug(f"   Unique Players: {len(projection_players)}")
+        for name in projection_players:
+            self.debug(f"     • {name}")
+
+    def alerts_not_matched(self, alerts_by_fixture: dict[str, list['PlayerAlert']]):
+        """Debug log showing alerts that did not match any projections."""
+        self.debug("Remaining Alerts Not Matched:")
+        for fixture, alerts in alerts_by_fixture.items():
+            if not alerts:
+                self.debug(f"   {fixture} - All Alerts Matched")
+            else:
+                self.debug(f"   {fixture} - {len(alerts)} Alerts Unmatched")
+                for alert in alerts:
+                    self.debug(f"     • {alert.player_name} - {alert.alert_level} - {alert.description}")
+
+    def alert_matched(self, alert: 'PlayerAlert', projection_player: str, projection_fixture: str):
+        self.debug(f"""
+Alert Matched: 
+- Alert Player: {alert.player_name} // Projection Player: {projection_player} // Fixture: {projection_fixture}
+- Alert Level: {alert.alert_level} // Alert Description: {alert.description}
+""")
+
+    def alert_matching_summary(self, matched_count: int, unmatched_count: int):
+        self.matched_count += matched_count
+        self.unmatched_count += unmatched_count
+        self.debug("Alert Matching Summary:")
+        self.debug(f"Alerts Matched: {self.matched_count}")
+        self.debug(f"Alerts Not Matched: {self.unmatched_count}")
+
+    def dry_run(self):
+        
+        self.subsection("DRY RUN: Skipping actual BigQuery write - view alerts in Postgres database")
+
+    def pipeline_complete(self, fixtures: list[dict], all_alerts: list['PlayerAlert']):
+
+        self.end_time = datetime.now()
+        duration = self.end_time - self.start_time
+
+        msg = f"""
+Projection Alert Pipeline Complete
+
+Run ID: {self.run_id}
+Fixtures processed: {len(fixtures)}
+Alerts generated: {len(all_alerts)}
+Alerts matched: {self.matched_count}
+Alerts not matched: {self.unmatched_count}
+Projections processed: {self.projections_count}
+Duration: {format_timedelta(duration)}
+Finished: {self.end_time.strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        self.section(msg)
 
 #TODO: integrate into async
 class FixtureLogger:

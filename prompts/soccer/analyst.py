@@ -1,5 +1,4 @@
 from prompts.base import AgentPrompt
-from datetime import datetime
 class SoccerAnalystPrompt(AgentPrompt):
     """Prompt for the Soccer Analyst Agent."""
 
@@ -58,9 +57,6 @@ Output requirements:
 You have access to real-time web search to research team tactics, player stats, and recent form.
 """
 
-    def get_system_values(self, **kwargs) -> dict:
-        return {}
-
     def user_prompt_template(self) -> str:
         return """
 Analyze the tactical implications of reported injuries for this upcoming fixture. 
@@ -113,19 +109,3 @@ Provide a comprehensive 1-2 paragraph report covering:
 
 Keep analysis grounded in reported facts and current season data.
 """
-
-    def get_user_values(self, **kwargs) -> dict:
-        """
-        Returns dictionary of placeholder values for user template.
-        If no placeholders used in user prompt, return empty dict.
-        """
-        context = kwargs.get("context")
-        injury_news = kwargs.get("injury_news")
-        return {
-            "fixture": context.fixture,
-            "fixture_date": context.fixture_date,
-            "team": context.team,
-            "opponent": context.opponent,
-            "current_date": datetime.now().strftime("%B %d, %Y"),
-            "injury_news": injury_news
-        }

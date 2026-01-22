@@ -16,6 +16,8 @@ from database.services import AlertService  # noqa: E402
 from config.pipeline_config import PipelineConfig  # noqa: E402
 from database.models.alert import Alert  # noqa: E402
 from prompts import get_sport_config  # noqa: E402
+from src.utils.date_extraction import parse_date_string  # noqa: E402
+from src.agents.models import AgentData  # noqa: E402
 class ProjectionAlertPipeline:
     """
     Main orchestrator for the projection risk alert pipeline.
@@ -92,39 +94,22 @@ class ProjectionAlertPipeline:
     # Step 4-5: Run Agent Pipeline
     # =========================================================================
     
-    def run_agents_for_fixture(self, fixture: str, match_time: str) -> list:
+    def run_agents_for_fixture(self, agent_data: AgentData) -> list:
         """
         Run the agentic pipeline for a fixture and save alerts.
         
         Args:
-            fixture: Fixture string (e.g., "Arsenal vs Brentford")
-            match_time: Match time string (e.g., "2025-12-06")
+            agent_data: AgentData object
             
         Returns:
             list: Generated PlayerAlert objects
         """
-        self.logger.fixture_info("Running agent pipeline", fixture)
-        
-        # Parse match_time string to datetime
-        try:
-            # Handle various date formats
-            if "T" in match_time:
-                fixture_date = datetime.fromisoformat(match_time)
-            elif " " in match_time:
-                fixture_date = datetime.strptime(match_time, "%Y-%m-%d %H:%M:%S")
-            else:
-                # Date only - default to noon
-                fixture_date = datetime.strptime(match_time, "%Y-%m-%d")
-                fixture_date = fixture_date.replace(hour=12, minute=0)
-        except ValueError as e:
-            self.logger.fixture_warning(f"Could not parse match_time '{match_time}': {e}", fixture)
-            fixture_date = datetime.now()
+        self.logger.fixture_info("Running agent pipeline", agent_data.fixture)
         
         # Run the agent pipeline
         # Note: Dry run mode still runs agents (for testing), but skips BigQuery push
         try:
-            alerts = self.agent_pipeline.run_and_save(fixture, fixture_date)
-            print(f"   ✅ Generated {len(alerts)} alerts")
+            alerts = self.agent_pipeline.run_and_save(agent_data)
             return alerts
         except Exception as e:
             print(f"   ❌ Agent pipeline failed: {e}")
@@ -150,23 +135,22 @@ class ProjectionAlertPipeline:
         Returns:
             int: Number of enriched rows pushed to BigQuery
         """
-        print("\n📊 Step 6-7: Enriching projections with alerts")
         
         if not fixtures:
-            print("   ⚠️  No fixtures to process")
+            self.logger.warning("No fixtures to process")
             return 0
 
         if not alerts:
-            print("   ℹ️  No alerts found for run id {self.run_id}")
+            self.logger.warning(f"No alerts found for run id {self.run_id}")
             return 0
         else:
-            print(f"   Processing {len(alerts)} alerts for run id {self.run_id}")
+            self.logger.info(f"Processing {len(alerts)} alerts for run id {self.run_id}")
         
         # Step 6b: Pull projections from BigQuery
         projections = self.projections_service.get_all_projections_for_fixtures(fixtures)
         
         if projections.empty:
-            print("   ❌ No projections found in BigQuery for these fixtures")
+            self.logger.error("No projections found in BigQuery for these fixtures")
             return 0
         
         # Step 6c: Enrich projections with alerts
@@ -178,18 +162,11 @@ class ProjectionAlertPipeline:
             enriched = self.projections_service.filter_alerted_projections(enriched)
         
         if enriched.empty:
-            print("   ⚠️  No enriched projections to push")
+            self.logger.error("No enriched projections to push - **This should not happen**")
             return 0
         
-        # Step 7: Push to BigQuery (skip in dry run mode)
-        if self.dry_run:
-            print(f"\n🔒 DRY RUN: Would push {len(enriched)} rows to BigQuery")
-            print(f"   Destination: {self.projections_service.dest_table_id}")
-            print(f"   (Skipping actual BigQuery write)")
-        else:
-            self.projections_service.push_enriched_projections(enriched)
+        self.projections_service.push_enriched_projections(enriched)
         
-        return len(enriched)
 
     def run_enrichment_only(self, run_id: str) -> None:
         """
@@ -243,40 +220,30 @@ class ProjectionAlertPipeline:
         
         all_alerts = []
         for i, fixture_data in enumerate(fixtures, 1):
-            fixture = fixture_data['fixture']
-            match_time = fixture_data['match_time']
+            agent_data = AgentData(
+                fixture=fixture_data['fixture'],
+                match_time=parse_date_string(fixture_data['match_time'])
+            )
             
             # Removing roster update from pipeline TODO: Separate Logging for Roster Updates
             # # Step 2-3: Update rosters
             # await self.roster_update_service.update_fixture_rosters(fixture)
             
             # Step 4-5: Run agents
-            alerts = self.run_agents_for_fixture(fixture, match_time)
+            alerts = self.run_agents_for_fixture(agent_data)
             all_alerts.extend(alerts)
         
         # Step 6-7: Enrich and push
-        print("\n" + "="*60)
-        print("📊 ENRICHMENT & EXPORT")
-        print("="*60)
+        self.logger.section("📊 PROJECTIONS MERGE WITH ALERTS & EXPORT TO BIGQUERY")
         
-        enriched_count = 0
         if not self.dry_run:
             # Extract fixture names for enrichment
             fixture_names = [f['fixture'] for f in fixtures]
-            enriched_count = self.enrich_and_push_projections(fixture_names, all_alerts)
+            self.enrich_and_push_projections(fixture_names, all_alerts)
         else:
-            print("\n🔒 Dry run - skipping BigQuery write")
+            self.logger.dry_run()
         
-        
-        # print("\n" + "="*60)
-        # print("✅ PIPELINE COMPLETE")
-        # print(f"   Run ID: {self.run_id}")
-        # print("="*60)
-        # print(f"   Fixtures processed: {len(fixtures)}")
-        # print(f"   Alerts generated: {len(all_alerts)}")
-        # print(f"   Projections enriched: {enriched_count}")
-        # print(f"   Duration: {duration:.1f} seconds")
-        # print(f"   Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        self.logger.pipeline_complete(fixtures, all_alerts)
     
     def run(self, fixtures: Optional[list[dict]] = None) -> None:
         """

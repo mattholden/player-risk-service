@@ -212,3 +212,6 @@ docker-compose.override.yml
 
 # Temporary test outputs
 tmp/
+
+# Pipeline logs
+logs/

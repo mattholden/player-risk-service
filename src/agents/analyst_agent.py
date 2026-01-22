@@ -5,21 +5,25 @@ import re
 
 from src.clients.grok_client import GrokClient
 from src.agents.models import TeamContext, Source, TeamAnalysis
-
-
+from src.logging import get_logger
+from prompts.base import AgentPrompt
+from src.utils.strict_prompting import strict_format
 class AnalystAgent:
     """
     Agent that analyzes injury news and determines the impact on a team's performance.
     """
-    def __init__(self, grok_client: GrokClient):
+    def __init__(self, grok_client: GrokClient, prompts: AgentPrompt):
         """
         Initialize Analyst Agent.
         
         Args:
             grok_client: Initialized GrokClient instance
+            prompts: AgentPrompt instance
         """
         self.grok_client = grok_client
-        print("✅ Analyst Agent initialized")
+        self.prompts = prompts
+        self.logger = get_logger()
+        self.logger.success("Analyst Agent Initialized")
 
     def analyze_injury_news(
         self,
@@ -29,35 +33,37 @@ class AnalystAgent:
         """
         Analyze injury news and determine the impact on a team's performance.
         """
-        print(f"\n🔍 Anaylzing Fixture: {context.fixture}")
-        print(f"   Fixture: {context.fixture}")
-        print(f"   Date: {context.fixture_date.strftime('%B %d, %Y')}")
-        print(f"   Team: {context.team}")
-        print(f"   Opponent: {context.opponent}")
 
         # Build the search prompt
         user_message = self._build_user_message(injury_news, context)
+        self.logger.agent_user_message("Analyst Agent", user_message)
         system_message = self._build_system_message()
-        print("System message:")
-        print(system_message)
-        print("User message:")
-        print(user_message)
+        self.logger.agent_system_message("Analyst Agent", system_message)
+
+        ###### Building prompts from prompt registry
+        ###### *****If truly making it sport agnostic then parameters have to be extracted specifically based on the soccer user template
+        # user_message = self.prompts.user_prompt_template(
+        #     context=context, 
+        #     injury_news=injury_news
+        # )
+        # self.logger.agent_user_message("Analyst Agent", user_message)
+        
+        # system_message = self.prompts.system_prompt_template()
+        # self.logger.agent_system_message("Analyst Agent", system_message)
+
         messages = [system_message, user_message]
 
         try:
-            response = self.grok_client.chat_completion(
+            response = self.grok_client.chat_with_streaming(
                 messages=messages,
+                tool_registry=None, ## Switch to roster tool registry when it's fixed
                 use_web_search=True,
                 use_x_search=True,
-                return_citations=True,
+                verbose=True
             )
-            print("\n" + "="*70)
-            print("🔍 DEBUG: Raw Grok Response")
-            print("="*70)
-            print(response.get('content', ''))
-            print("="*70 + "\n")
+            self.logger.grok_response("Analyst Agent", response)
         except Exception as e:
-            print(f"❌ Analysis failed: {e}")
+            self.logger.error(f"Analyst Agent Failed: {e}")
             return None
         
         return TeamAnalysis(

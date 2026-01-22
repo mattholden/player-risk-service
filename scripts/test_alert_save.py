@@ -89,7 +89,7 @@ def test_save_alerts():
     print("💾 Saving alerts via AlertService...")
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         saved_count = service.save_alerts(alerts)
         print(f"✅ AlertService.save_alerts() returned: {saved_count}")
         return True
@@ -107,7 +107,7 @@ def test_query_by_fixture():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         fixture = "Test Team A vs Test Team B"
         
         alerts = service.get_alerts_for_fixture(fixture)
@@ -131,7 +131,7 @@ def test_query_multiple_fixtures():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         fixtures = ["Test Team A vs Test Team B", "Nonexistent Fixture"]
         
         alerts = service.get_alerts_for_fixtures(fixtures)
@@ -155,7 +155,7 @@ def test_query_active_alerts():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         
         alerts = service.get_active_alerts()
         print(f"\n⚡ Active alerts: {len(alerts)}")
@@ -182,7 +182,7 @@ def test_query_by_level():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         
         # Query high and medium alerts
         levels = [AlertLevel.HIGH_ALERT, AlertLevel.MEDIUM_ALERT]
@@ -207,7 +207,7 @@ def test_query_alerts_since():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         
         # Query alerts from the last hour
         since = datetime.now() - timedelta(hours=1)
@@ -235,7 +235,7 @@ def test_deactivate_fixture():
     print("=" * 70)
     
     try:
-        service = AlertService()
+        service = AlertService(run_id='test_run_id')
         fixture = "Test Team A vs Test Team B"
         
         # Check active count before

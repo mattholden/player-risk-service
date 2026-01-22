@@ -41,7 +41,7 @@ def test_tool_infrastructure():
     print("\n📋 Testing direct tool execution:")
     result = tool_registry.execute("get_active_roster", {
         "team": "Arsenal",
-        "league": "Premier League"
+        "league": "La Liga"
     })
     print(f"   Result: {result[:200]}...")
     
@@ -124,8 +124,8 @@ def main():
     # Test 1: Infrastructure
     test_tool_infrastructure()
     
-    # Test 2: LLM integration
-    test_with_llm()
+    # # Test 2: LLM integration
+    # test_with_llm()
     
     print("\n" + "="*60)
     print("Testing complete!")

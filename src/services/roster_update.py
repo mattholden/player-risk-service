@@ -19,8 +19,7 @@ from database import session_scope
 from database.models.team import Team
 from src.services.roster_sync import RosterSyncService
 from src.services.transfermarkt_scraper import TransfermarktScraper, ScraperConfig
-
-
+from src.logging import get_logger
 @dataclass
 class UpdateResult:
     """
@@ -117,6 +116,8 @@ class RosterUpdateService:
         """
         self.scraper = TransfermarktScraper(config=scraper_config)
         self.sync_service = RosterSyncService()
+        self.logger = get_logger()
+        self.logger.success("Roster Update Service Initialized")
     
     def get_active_teams(self) -> List[Team]:
         """
@@ -190,7 +191,6 @@ class RosterUpdateService:
         
         try:
             # 1. Scrape roster from Transfermarkt
-            print(f"\n🔄 Updating {team.team_name} ({team.league})...")
             players = await self.scraper.get_squad(
                 team_slug=team.transfermarkt_slug,
                 team_id=team.transfermarkt_id
@@ -329,11 +329,13 @@ class RosterUpdateService:
         Returns:
             List of UpdateResult for each team (0-2 results depending on success)
         """
+        self.logger.fixture_detail("Updating rosters", fixture)
+
         results = []
         
         # Parse fixture into team names
         if " vs " not in fixture:
-            print(f"⚠️  Invalid fixture format: {fixture}")
+            self.logger.fixture_warning("Invalid fixture format for updating rosters", fixture)
             return results
         
         teams = [t.strip() for t in fixture.split(" vs ")]

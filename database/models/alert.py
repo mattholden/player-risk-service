@@ -29,6 +29,9 @@ class Alert(Base):
     
     # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Run ID for the pipeline execution
+    run_id = Column(String(36), nullable=True, index=True)
     
     # Alert information
     player_name = Column(String(200), nullable=False)
@@ -72,6 +75,7 @@ class Alert(Base):
         """
         return {
             'id': self.id,
+            'run_id': self.run_id,
             'player_name': self.player_name,
             'fixture': self.fixture,
             'fixture_date': self.fixture_date.isoformat() if self.fixture_date else None,

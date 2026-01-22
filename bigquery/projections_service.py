@@ -10,14 +10,14 @@ This service handles:
 
 import os
 from typing import Optional, Union, List
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 
 from bigquery.client import BigQueryClient
 from src.utils.matching import PlayerMatcher
 from src.agents.models import PlayerAlert
 from database.models.alert import Alert
-
+from src.logging import get_logger
 # Type alias for alert objects - accepts either pydantic model or database model
 AlertLike = Union[PlayerAlert, Alert]
 
@@ -54,9 +54,11 @@ class ProjectionsService:
             dest_dataset: Dataset for enriched output (env: BIGQUERY_DEST_DATASET)
             dest_table: Table for enriched output (env: BIGQUERY_DEST_TABLE)
         """
+        self.today = datetime.now().strftime('%Y-%m-%d')
+        self.specific_date = datetime(2025,1,14,12,0,0)
         self.client = client or BigQueryClient()
         self.matcher = PlayerMatcher()
-        
+        self.logger = get_logger()
         # Source table configuration
         self.source_dataset = source_dataset or os.getenv("BIGQUERY_SOURCE_DATASET")
         self.source_table = source_table or os.getenv("BIGQUERY_SOURCE_TABLE")
@@ -69,6 +71,8 @@ class ProjectionsService:
         project_id = self.client.project_id
         self.source_table_id = f"{project_id}.{self.source_dataset}.{self.source_table}"
         self.dest_table_id = f"{project_id}.{self.dest_dataset}.{self.dest_table}"
+
+        self.logger.success("Projections Service Initialized")
     
     def get_upcoming_fixtures(
         self,
@@ -95,24 +99,18 @@ class ProjectionsService:
                 ]
         """
         
-        today = datetime.now().strftime('%Y-%m-%d')
-        
         query = f"""
             SELECT DISTINCT 
                 {fixture_column} as fixture,
                 {match_time_column} as match_time,
                 {league_column} as league
             FROM `{self.source_table_id}`
-            WHERE {match_time_column} > '{today}'
+            WHERE {match_time_column} > '{self.specific_date}'
             ORDER BY {match_time_column}
         """
         
-        print("📅 Fetching upcoming fixtures from BigQuery...")
-        
         df = self.client.query(query)
         fixtures = df.to_dict(orient="records")
-        
-        print(f"   Found {len(fixtures)} fixtures")
         
         return fixtures
     
@@ -178,16 +176,18 @@ class ProjectionsService:
             return pd.DataFrame()
         
         # Build IN clause for fixtures
-        fixtures_str = ", ".join([f"'{f}'" for f in fixtures])
+        fixtures_str = ", ".join([self._escape_quotes(f) for f in fixtures])
+        self.logger.debug(f"DEBUG fixtures_str: {fixtures_str}") #######
         query = f"""
             SELECT * 
             FROM `{self.source_table_id}`
             WHERE {fixture_column} IN ({fixtures_str})
+            AND match_time > '{self.specific_date}'
         """
-        
-        print(f"📊 Fetching projections for {len(fixtures)} fixtures...")
+        self.logger.info(f"📊 Fetching projections for {len(fixtures)} fixtures...")
         df = self.client.query(query)
-        print(f"   Found {len(df)} total projection rows")
+        self.logger.info(f"   Found {len(df)} total projection rows")
+        self.logger.projection_summary(df, player_name_column)
         
         return df
     
@@ -214,17 +214,17 @@ class ProjectionsService:
             pd.DataFrame: Enriched projections with alert columns
         """
         if projections.empty:
-            print("⚠️ No projections to enrich")
+            self.logger.warning("No projections to enrich")
             return projections
         
         if not alerts:
-            print("⚠️ No alerts to match - returning projections with null alert columns")
+            self.logger.warning("No alerts to match - returning projections with null alert columns")
             projections = projections.copy()
             projections["alert_level"] = None
             projections["alert_description"] = None
             return projections
         
-        print(f"\n🔍 Matching {len(alerts)} alerts to {len(projections)} projections...")
+        self.logger.info(f"Matching {len(alerts)} alerts to {len(projections)} projections...")
         
         # Create a copy to avoid modifying original
         enriched = projections.copy()
@@ -258,10 +258,12 @@ class ProjectionsService:
                     enriched.at[idx, "alert_description"] = alert.description
                     enriched.at[idx, "alert_matched"] = True
                     matched_count += 1
+                    alerts_by_fixture[projection_fixture].remove(alert)
+                    self.logger.alert_matched(alert, projection_player, projection_fixture)
                     break
-        
-        print(f"   ✅ Matched {matched_count} projections with alerts")
-        print(f"   ℹ️  {len(enriched) - matched_count} projections have no matching alerts")
+        unmatched_count = len(alerts) - matched_count
+        self.logger.alert_matching_summary(matched_count, unmatched_count)
+        self.logger.alerts_not_matched(alerts_by_fixture)
         
         return enriched
     
@@ -306,18 +308,18 @@ class ProjectionsService:
                 - WRITE_APPEND: Append new rows
         """
         if enriched_projections.empty:
-            print("⚠️ No data to push to BigQuery")
+            self.logger.error("No data to push to BigQuery")
             return
         
         # Add metadata columns
         enriched_projections = enriched_projections.copy()
-        enriched_projections["enriched_at"] = datetime.utcnow()
+        enriched_projections["enriched_at"] = datetime.now(timezone.utc)
         
         # Remove temporary matching column if present
         if "alert_matched" in enriched_projections.columns:
             enriched_projections = enriched_projections.drop(columns=["alert_matched"])
         
-        print(f"\n📤 Pushing {len(enriched_projections)} rows to {self.dest_table_id}...")
+        self.logger.info(f"Pushing {len(enriched_projections)} rows to {self.dest_table_id}...")
         
         self.client.write_dataframe(
             enriched_projections,
@@ -395,4 +397,10 @@ class ProjectionsService:
         print(f"{'='*60}")
         
         return enriched
+
+    def _escape_quotes(self, s: str) -> str:
+        """Escape single quotes for SQL strings and wrap in quotes."""
+        # Use backslash escaping instead of doubled quotes
+        escaped = s.replace("\\", "\\\\").replace("'", "\\'")
+        return f"'{escaped}'"
 

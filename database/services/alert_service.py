@@ -14,6 +14,7 @@ from typing import List, Optional, TYPE_CHECKING
 from database.database import session_scope
 from database.models.alert import Alert
 from database.enums import AlertLevel
+from src.logging import get_logger
 
 if TYPE_CHECKING:
     from src.agents.models import PlayerAlert
@@ -33,6 +34,11 @@ class AlertService:
         alerts = service.get_alerts_for_fixture("Arsenal vs Brentford")
         active = service.get_active_alerts()
     """
+
+    def __init__(self, run_id: str):
+        self.run_id = run_id
+        self.logger = get_logger()
+        self.logger.success("Alert Service Initialized")
     
     def save_alerts(self, alerts: List["PlayerAlert"]) -> int:
         """
@@ -45,9 +51,11 @@ class AlertService:
             int: Number of alerts saved
         """
         if not alerts:
+            self.logger.warning("No alerts to save in Alert Service")
             return 0
         
-        print(f"\n💾 Saving {len(alerts)} alerts to database...")
+        self.logger.info(f"Saving {len(alerts)} alerts to database...")
+        self.logger.alert_service_alerts(alerts)
         
         with session_scope() as session:
             saved_count = 0
@@ -61,12 +69,13 @@ class AlertService:
                     last_alert_update=datetime.now(),
                     acknowledged=False,
                     active_projection=True,
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
+                    run_id=self.run_id
                 )
                 session.add(db_alert)
                 saved_count += 1
         
-        print(f"✅ Saved {saved_count} player alerts to database")
+        self.logger.success(f"Saved {saved_count} player alerts to database")
         return saved_count
     
     def get_alerts_for_fixture(self, fixture: str) -> List[Alert]:
@@ -243,6 +252,7 @@ class AlertService:
         """
         return Alert(
             id=alert.id,
+            run_id=alert.run_id,
             player_name=alert.player_name,
             fixture=alert.fixture,
             fixture_date=alert.fixture_date,
@@ -253,4 +263,13 @@ class AlertService:
             active_projection=alert.active_projection,
             created_at=alert.created_at
         )
+
+    def get_alerts_by_run_id(self, run_id: str) -> List[Alert]:
+        """Get all alerts from a specific pipeline run."""
+        with session_scope() as session:
+            alerts = session.query(Alert).filter(
+                Alert.run_id == run_id
+            ).order_by(Alert.created_at).all()
+            
+            return [self._detach_alert(a) for a in alerts]
 

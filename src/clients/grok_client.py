@@ -396,6 +396,7 @@ class GrokClient:
             tools=tools if tools else None,
             reasoning_effort="high",
             max_turns=5,
+            parallel_tool_calls=False
         )
 
         for message in messages:
@@ -407,14 +408,20 @@ class GrokClient:
                 chat.append(user(content))
 
         research_turns = 0
+        completion_tokens_list = []
+        reasoning_tokens_list = []
+        prompt_tokens_list = []
+        total_tokens_list = []
         
         while True:
             total_server_side_tool_calls = 0
             total_client_side_tool_calls = 0
             research_turns += 1
             client_side_tool_calls = []
+            # previous_usage = None 
             
             for response, chunk in chat.stream():
+                current_usage = response.usage
                 for tool_call in chunk.tool_calls:
                     tool_type = get_tool_call_type(tool_call)
                     if tool_type == "client_side_tool":
@@ -422,6 +429,17 @@ class GrokClient:
                         total_client_side_tool_calls += 1
                     else:
                         total_server_side_tool_calls += 1
+
+                    print(f"Tool Call: {tool_call.function.name} - {tool_type}")
+                    print(f"Usage: {current_usage}")
+                    print(current_usage.completion_tokens)
+                    print(current_usage.reasoning_tokens)
+                    print(current_usage.prompt_tokens)
+                    print(f"{current_usage.total_tokens}/n")
+                    completion_tokens_list.append(current_usage.completion_tokens)
+                    reasoning_tokens_list.append(current_usage.reasoning_tokens)
+                    prompt_tokens_list.append(current_usage.prompt_tokens)
+                    total_tokens_list.append(current_usage.total_tokens)
                     
             self.logger.grok_client_tool_calls(research_turns, total_client_side_tool_calls, total_server_side_tool_calls)
             
@@ -443,7 +461,7 @@ class GrokClient:
                     self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
             
-
+        print(f"Total Tokens List {total_tokens_list}")            
         return {
             "content": response.content,
             "role": "assistant",

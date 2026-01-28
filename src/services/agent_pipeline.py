@@ -77,7 +77,7 @@ class AgentPipeline:
         for context in agent_data.team_contexts:
             self.logger.reseach_agent_processing(context)
             research_response = self.research_agent.research_team(context).findings['description']
-            
+            breakpoint()
             self.logger.analyst_agent_processing(context)
             analyst_response = self.analyst_agent.analyze_injury_news(context, research_response)
             

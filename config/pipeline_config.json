@@ -1,7 +1,7 @@
 {
     "leagues": ["Premier League", "Bundesliga", "Primera División"],
-    "fixtures": ["Aston Villa vs Brentford"],
-    "dry_run": true,
+    "fixtures": ["Liverpool vs Newcastle United"],
+    "dry_run": false,
     "fixtures_only": false,
     "push_all": true,
     "verbose": true,

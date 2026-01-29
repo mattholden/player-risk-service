@@ -70,7 +70,9 @@ class AnalystAgent:
             team_name=context.team,
             opponent_name=context.opponent,
             fixture=context.fixture,
-            team_analysis=self.clean_response(response.get('content', ''))
+            team_analysis=self.clean_response(response.get('content', '')),
+            usage=response.get('usage', {}),
+            server_side_tool_usage=response.get('server_side_tool_usage', {}),
         )
     
     def clean_response(self, text: str) -> str:

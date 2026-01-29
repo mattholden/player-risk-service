@@ -94,26 +94,56 @@ class ProjectionAlertPipeline:
     # Step 4-5: Run Agent Pipeline
     # =========================================================================
     
-    def run_agents_for_fixture(self, agent_data: AgentData) -> list:
+    def run_agents_for_fixture(self, agent_data: AgentData, max_retries: int = 3) -> list:
         """
-        Run the agentic pipeline for a fixture and save alerts.
+        Run the agentic pipeline for a fixture and save alerts with retry logic.
+        
+        Implements a retry mechanism that:
+        - Retries up to max_retries times on failure
+        - Checks if alerts were saved before retrying (to avoid duplicates)
+        - Gracefully continues to next fixture if all retries exhausted
         
         Args:
             agent_data: AgentData object
+            max_retries: Maximum number of retry attempts (default: 3)
             
         Returns:
-            list: Generated PlayerAlert objects
+            list: Generated PlayerAlert objects (empty list if all retries fail)
         """
         self.logger.fixture_info("Running agent pipeline", agent_data.fixture)
         
-        # Run the agent pipeline
+        # Run the agent pipeline with retry logic
         # Note: Dry run mode still runs agents (for testing), but skips BigQuery push
-        try:
-            alerts = self.agent_pipeline.run_and_save(agent_data)
-            return alerts
-        except Exception as e:
-            print(f"   ❌ Agent pipeline failed: {e}")
-            raise e
+        for attempt in range(1, max_retries + 1):
+            try:
+                alerts = self.agent_pipeline.run_and_save(agent_data)
+                return alerts
+            except Exception as e:
+                # Check if alerts were written to DB despite the error
+                # This can happen if the error occurred after save_alerts()
+                if self.agent_pipeline.alert_service.alerts_exist_for_fixture(agent_data.fixture):
+                    self.logger.warning(
+                        f"Fixture {agent_data.fixture} had error but alerts were saved. "
+                        f"Retrieving saved alerts."
+                    )
+                    return self.agent_pipeline.alert_service.get_alerts_for_fixture_and_run(
+                        agent_data.fixture
+                    )
+                
+                # Log the failure
+                if attempt < max_retries:
+                    self.logger.warning(
+                        f"Attempt {attempt}/{max_retries} failed for {agent_data.fixture}: {e}. "
+                        f"Retrying..."
+                    )
+                else:
+                    self.logger.error(
+                        f"Fixture {agent_data.fixture} failed after {max_retries} attempts: {e}. "
+                        f"Moving to next fixture."
+                    )
+        
+        # All retries exhausted - return empty list to continue pipeline
+        return []
     
     # =========================================================================
     # Step 6-7: Enrich and Push

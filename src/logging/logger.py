@@ -12,6 +12,8 @@ import pandas as pd
 if TYPE_CHECKING:
     from src.agents.models import TeamContext
     from src.agents.models import PlayerAlert
+    from src.agents.models import AgentUsage
+
 _logger_instance: Optional['PipelineLogger'] = None
 
 def get_logger() -> 'PipelineLogger':
@@ -185,9 +187,18 @@ Shark Agent Processing
         self.debug(f"📊 Research Turn {research_turns}:")
         self.debug(f"   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}")
 
+    def grok_client_usage(self, usage: 'AgentUsage'):
+        self.success(f"Recorded agent usage for {usage.agent_name}")
+        self.debug(f"   Total Tokens: {usage.total_tokens}")
+        self.debug(f"   Completion Tokens: {usage.completion_tokens}")
+        self.debug(f"   Reasoning Tokens: {usage.reasoning_tokens}")
+        self.debug(f"   Prompt Tokens: {usage.prompt_tokens}")
+        self.debug(f"   Server Side Tool Usage: {usage.server_side_tool_usage}")
+
     def grok_response(self, agent: str, response):
         """
         Log Grok response. Handles dict, string (JSON or plain), list, or any type.
+        Also logs usage statistics (tokens) if available.
         """
         self.debug(f"🔍 DEBUG: {agent} Response")
         

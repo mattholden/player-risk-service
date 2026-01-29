@@ -273,3 +273,40 @@ class AlertService:
             
             return [self._detach_alert(a) for a in alerts]
 
+    def alerts_exist_for_fixture(self, fixture: str) -> bool:
+        """
+        Check if alerts exist for a specific fixture in the current run.
+        
+        Used by retry logic to determine if alerts were saved before an error occurred.
+        
+        Args:
+            fixture: Fixture string (e.g., "Arsenal vs Brentford")
+            
+        Returns:
+            True if alerts exist for this fixture and run_id, False otherwise
+        """
+        with session_scope() as session:
+            count = session.query(Alert).filter(
+                Alert.fixture == fixture,
+                Alert.run_id == self.run_id
+            ).count()
+            return count > 0
+
+    def get_alerts_for_fixture_and_run(self, fixture: str) -> List[Alert]:
+        """
+        Get all alerts for a specific fixture in the current run.
+        
+        Args:
+            fixture: Fixture string (e.g., "Arsenal vs Brentford")
+            
+        Returns:
+            List of Alert objects for this fixture and run_id
+        """
+        with session_scope() as session:
+            alerts = session.query(Alert).filter(
+                Alert.fixture == fixture,
+                Alert.run_id == self.run_id
+            ).all()
+            
+            return [self._detach_alert(a) for a in alerts]
+

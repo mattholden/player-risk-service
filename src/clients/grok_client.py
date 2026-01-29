@@ -396,7 +396,7 @@ class GrokClient:
             tools=tools if tools else None,
             reasoning_effort="high",
             max_turns=5,
-            parallel_tool_calls=False
+            parallel_tool_calls=True
         )
 
         for message in messages:
@@ -408,40 +408,23 @@ class GrokClient:
                 chat.append(user(content))
 
         research_turns = 0
-        completion_tokens_list = []
-        reasoning_tokens_list = []
-        prompt_tokens_list = []
-        total_tokens_list = []
         
         while True:
-            total_server_side_tool_calls = 0
-            total_client_side_tool_calls = 0
+            server_side_tool_call_count = 0
+            client_side_tool_call_count = 0
             research_turns += 1
             client_side_tool_calls = []
-            # previous_usage = None 
             
             for response, chunk in chat.stream():
-                current_usage = response.usage
                 for tool_call in chunk.tool_calls:
                     tool_type = get_tool_call_type(tool_call)
                     if tool_type == "client_side_tool":
                         client_side_tool_calls.append(tool_call)
-                        total_client_side_tool_calls += 1
+                        client_side_tool_call_count += 1
                     else:
-                        total_server_side_tool_calls += 1
-
-                    print(f"Tool Call: {tool_call.function.name} - {tool_type}")
-                    print(f"Usage: {current_usage}")
-                    print(current_usage.completion_tokens)
-                    print(current_usage.reasoning_tokens)
-                    print(current_usage.prompt_tokens)
-                    print(f"{current_usage.total_tokens}/n")
-                    completion_tokens_list.append(current_usage.completion_tokens)
-                    reasoning_tokens_list.append(current_usage.reasoning_tokens)
-                    prompt_tokens_list.append(current_usage.prompt_tokens)
-                    total_tokens_list.append(current_usage.total_tokens)
+                        server_side_tool_call_count += 1
                     
-            self.logger.grok_client_tool_calls(research_turns, total_client_side_tool_calls, total_server_side_tool_calls)
+            self.logger.grok_client_tool_calls(research_turns, client_side_tool_call_count, server_side_tool_call_count)
             
             chat.append(response)
             
@@ -461,14 +444,28 @@ class GrokClient:
                     self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
             
-        print(f"Total Tokens List {total_tokens_list}")            
+        # Convert SDK usage objects to dicts
+        raw_usage = getattr(response, 'usage', None)
+        usage_dict = {}
+        if raw_usage:
+            usage_dict = {
+                'total_tokens': getattr(raw_usage, 'total_tokens', 0),
+                'completion_tokens': getattr(raw_usage, 'completion_tokens', 0),
+                'reasoning_tokens': getattr(raw_usage, 'reasoning_tokens', 0),
+                'prompt_tokens': getattr(raw_usage, 'prompt_tokens', 0),
+            }
+        
+        # Convert server side tool usage (also a protobuf object)
+        raw_server_usage = getattr(response, 'server_side_tool_usage', None)
+        server_usage_dict = dict(raw_server_usage) if raw_server_usage else {}
+        
         return {
             "content": response.content,
             "role": "assistant",
             "model": self.model,
-            "sources": response.citations,
-            "usage": response.usage,
-            "server_side_tool_usage": response.server_side_tool_usage,
+            "sources": getattr(response, 'citations', []),
+            "usage": usage_dict,
+            "server_side_tool_usage": server_usage_dict,
             "created_at": datetime.now()
         }
 

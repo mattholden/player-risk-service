@@ -90,6 +90,8 @@ class GrokClient:
         self._request_timestamps: List[datetime] = []
         
         self.logger.success(f"Grok Client Initialized (model: {model}, using xAI SDK)")
+
+        self.server_side_tool_calls: dict[str, int] = {}
     
     def _check_rate_limit(self) -> None:
         """
@@ -443,6 +445,11 @@ class GrokClient:
                 else:
                     self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
+
+            raw_server_usage = getattr(response, 'server_side_tool_usage', None)
+            if raw_server_usage:
+                server_usage_dict = dict(raw_server_usage)
+                self._process_server_side_tool_calls(server_usage_dict)
             
         # Convert SDK usage objects to dicts
         raw_usage = getattr(response, 'usage', None)
@@ -455,9 +462,6 @@ class GrokClient:
                 'prompt_tokens': getattr(raw_usage, 'prompt_tokens', 0),
             }
         
-        # Convert server side tool usage (also a protobuf object)
-        raw_server_usage = getattr(response, 'server_side_tool_usage', None)
-        server_usage_dict = dict(raw_server_usage) if raw_server_usage else {}
         
         return {
             "content": response.content,
@@ -465,9 +469,15 @@ class GrokClient:
             "model": self.model,
             "sources": getattr(response, 'citations', []),
             "usage": usage_dict,
-            "server_side_tool_usage": server_usage_dict,
+            "server_side_tool_usage": self.server_side_tool_calls,
             "created_at": datetime.now()
         }
+
+    def _process_server_side_tool_calls(self, server_side_tool_calls: dict[str, int]) -> None:
+        for tool_call, count in server_side_tool_calls.items():
+            if tool_call not in self.server_side_tool_calls:
+                self.server_side_tool_calls[tool_call] = 0
+            self.server_side_tool_calls[tool_call] += count
 
     # def _parse_response(self, response) -> Dict[str, Any]:
     #     """

@@ -99,7 +99,7 @@ class ResearchAgent:
                 findings=json.loads(response.get('content', '{}')),
                 sources=response.get('sources', []),
                 usage=response.get('usage', {}),
-                server_side_tool_usage=response.get('server_side_tool_usage', {}),
+                grok_client_tool_calls=response.get('grok_client_tool_calls', {}),
                 search_timestamp=datetime.now()
             )
             
@@ -118,6 +118,8 @@ class ResearchAgent:
                     'speculation': []
                 },
                 sources=[],
+                usage={},
+                grok_client_tool_calls={},
                 search_timestamp=datetime.now()
             )
     

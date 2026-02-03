@@ -106,7 +106,7 @@ class AgentPipeline:
                 last_error = "Invalid response structure"
                 
             except Exception as e:
-                # Don't retry on deliberate interrupts (Ctrl+C, quit, debugger exit)
+                # Don't retry on deliberate interrupts (debugger exit)
                 # Note: KeyboardInterrupt and SystemExit don't inherit from Exception,
                 # but BdbQuit (debugger quit) does, so we check explicitly
                 if isinstance(e, BdbQuit):
@@ -163,7 +163,7 @@ class AgentPipeline:
             agent_usages=[],
             start_timestamp=datetime.now()
         )
-    def _record_agent_usage(self, agent_name: str, usage: dict, server_side_tool_usage: dict):
+    def _record_agent_usage(self, agent_name: str, usage: dict, grok_client_tool_calls: dict):
         """
         Record agent usage data from Grok response.
         """
@@ -174,7 +174,8 @@ class AgentPipeline:
                 completion_tokens=usage.get('completion_tokens'),
                 reasoning_tokens=usage.get('reasoning_tokens'),
                 prompt_tokens=usage.get('prompt_tokens'),
-                server_side_tool_usage=server_side_tool_usage,
+                server_side_tool_calls=grok_client_tool_calls.get('server_side_tool_calls', {}),
+                client_side_tool_calls=grok_client_tool_calls.get('client_side_tool_calls', {}),
                 completion_timestamp=datetime.now()
             )
             self._current_fixture_usage.agent_usages.append(agent_usage)
@@ -218,8 +219,7 @@ class AgentPipeline:
                 validator_fn=self._validate_research_response
             )
             research_response = research_result.findings.get('description')
-            self._record_agent_usage(f"Research Agent ({context.team})", research_result.usage, research_result.server_side_tool_usage)
-
+            self._record_agent_usage(f"Research Agent ({context.team})", research_result.usage, research_result.grok_client_tool_calls)
             # Analyst Agent with retry and validation
             self.logger.analyst_agent_processing(context)
             analyst_result = self._run_agent_with_retry(
@@ -229,7 +229,7 @@ class AgentPipeline:
                 validator_fn=self._validate_analyst_response
             )
             analyst_response = analyst_result.team_analysis
-            self._record_agent_usage(f"Analyst Agent ({context.team})", analyst_result.usage, analyst_result.server_side_tool_usage)
+            self._record_agent_usage(f"Analyst Agent ({context.team})", analyst_result.usage, analyst_result.grok_client_tool_calls)
             team_analyses.append({
                 'context': context,
                 'research': research_response,
@@ -238,7 +238,7 @@ class AgentPipeline:
         
         self.logger.shark_agent_processing(agent_data.team_contexts[0])
         shark_response = self.shark_agent.analyze_player_risk_for_fixture(team_analyses)
-        self._record_agent_usage(f"Shark Agent ({context.fixture})", shark_response.usage, shark_response.server_side_tool_usage)
+        self._record_agent_usage(f"Shark Agent ({context.fixture})", shark_response.usage, shark_response.grok_client_tool_calls)
         self._record_fixture_usage()
 
         return shark_response.alerts

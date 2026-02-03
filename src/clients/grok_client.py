@@ -410,11 +410,13 @@ class GrokClient:
                 chat.append(user(content))
 
         research_turns = 0
+        server_side_tool_call_tracking = {}
+        client_side_tool_call_tracking = {}
         
         while True:
-            server_side_tool_call_count = 0
-            client_side_tool_call_count = 0
             research_turns += 1
+            server_side_tool_call_tracking[f"Turn {research_turns}"] = {}
+            client_side_tool_call_tracking[f"Turn {research_turns}"] = {}
             client_side_tool_calls = []
             
             for response, chunk in chat.stream():
@@ -422,11 +424,12 @@ class GrokClient:
                     tool_type = get_tool_call_type(tool_call)
                     if tool_type == "client_side_tool":
                         client_side_tool_calls.append(tool_call)
-                        client_side_tool_call_count += 1
+                        client_side_tool_call_tracking[f"Turn {research_turns}"][tool_call.function.name] = client_side_tool_call_tracking[f"Turn {research_turns}"].get(tool_call.function.name, 0) + 1
+                       
                     else:
-                        server_side_tool_call_count += 1
+                        server_side_tool_call_tracking[f"Turn {research_turns}"][tool_call.function.name] = server_side_tool_call_tracking[f"Turn {research_turns}"].get(tool_call.function.name, 0) + 1
                     
-            self.logger.grok_client_tool_calls(research_turns, client_side_tool_call_count, server_side_tool_call_count)
+            self.logger.grok_client_tool_calls(research_turns, client_side_tool_call_tracking, server_side_tool_call_tracking)
             
             chat.append(response)
             
@@ -445,11 +448,6 @@ class GrokClient:
                 else:
                     self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
-
-            raw_server_usage = getattr(response, 'server_side_tool_usage', None)
-            if raw_server_usage:
-                server_usage_dict = dict(raw_server_usage)
-                self._process_server_side_tool_calls(server_usage_dict)
             
         # Convert SDK usage objects to dicts
         raw_usage = getattr(response, 'usage', None)
@@ -462,22 +460,22 @@ class GrokClient:
                 'prompt_tokens': getattr(raw_usage, 'prompt_tokens', 0),
             }
         
-        
+        # Tools Calls
+        grok_client_tool_calls = {
+                "server_side_tool_calls": server_side_tool_call_tracking,
+                "client_side_tool_calls": client_side_tool_call_tracking,
+        }
+
+
         return {
             "content": response.content,
             "role": "assistant",
             "model": self.model,
             "sources": getattr(response, 'citations', []),
             "usage": usage_dict,
-            "server_side_tool_usage": self.server_side_tool_calls,
+            "grok_client_tool_calls": grok_client_tool_calls,
             "created_at": datetime.now()
         }
-
-    def _process_server_side_tool_calls(self, server_side_tool_calls: dict[str, int]) -> None:
-        for tool_call, count in server_side_tool_calls.items():
-            if tool_call not in self.server_side_tool_calls:
-                self.server_side_tool_calls[tool_call] = 0
-            self.server_side_tool_calls[tool_call] += count
 
     # def _parse_response(self, response) -> Dict[str, Any]:
     #     """

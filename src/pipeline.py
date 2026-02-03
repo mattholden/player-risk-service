@@ -1,4 +1,5 @@
 import asyncio
+from bdb import BdbQuit
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -94,7 +95,7 @@ class ProjectionAlertPipeline:
     # Step 4-5: Run Agent Pipeline
     # =========================================================================
     
-    def run_agents_for_fixture(self, agent_data: AgentData) -> list:
+    def run_agents_for_fixture(self, agent_data: AgentData) -> Optional[list]:
         """
         Run the agentic pipeline for a fixture and save alerts.
         
@@ -105,7 +106,8 @@ class ProjectionAlertPipeline:
             agent_data: AgentData object
             
         Returns:
-            list: Generated PlayerAlert objects (empty list if pipeline fails)
+            list: Generated PlayerAlert objects on success (may be empty)
+            None: On failure
         """
         self.logger.fixture_info("Running agent pipeline", agent_data.fixture)
         
@@ -113,6 +115,10 @@ class ProjectionAlertPipeline:
             alerts = self.agent_pipeline.run_and_save(agent_data)
             return alerts
         except Exception as e:
+            # Don't catch debugger quit - let it terminate the program
+            if isinstance(e, BdbQuit):
+                raise
+            
             # Check if alerts were written to DB despite the error
             # This can happen if the error occurred after save_alerts()
             if self.agent_pipeline.alert_service.alerts_exist_for_fixture(agent_data.fixture):
@@ -128,7 +134,7 @@ class ProjectionAlertPipeline:
             self.logger.error(
                 f"Fixture {agent_data.fixture} failed: {e}. Moving to next fixture."
             )
-            return []
+            return None
     
     # =========================================================================
     # Step 6-7: Enrich and Push
@@ -235,6 +241,9 @@ class ProjectionAlertPipeline:
         self.logger.section("PROCESSING FIXTURES")
         
         all_alerts = []
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+        
         for i, fixture_data in enumerate(fixtures, 1):
             agent_data = AgentData(
                 fixture=fixture_data['fixture'],
@@ -247,7 +256,20 @@ class ProjectionAlertPipeline:
             
             # Step 4-5: Run agents
             alerts = self.run_agents_for_fixture(agent_data)
-            all_alerts.extend(alerts)
+            
+            if alerts is None:
+                # Fixture failed
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    self.logger.error(
+                        f"Circuit breaker triggered: {max_consecutive_failures} consecutive fixture failures. "
+                        f"Stopping pipeline to prevent further resource waste."
+                    )
+                    break
+            else:
+                # Fixture succeeded - reset counter and collect alerts
+                consecutive_failures = 0
+                all_alerts.extend(alerts)
         
         # Step 6-7: Enrich and push
         self.logger.section("📊 PROJECTIONS MERGE WITH ALERTS & EXPORT TO BIGQUERY")

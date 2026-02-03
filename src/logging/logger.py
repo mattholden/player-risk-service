@@ -180,12 +180,20 @@ Shark Agent Processing
 
     def grok_client_tool_calls(
         self,
-        research_turns: int, 
-        total_client_side_tool_calls: int, 
-        total_server_side_tool_calls: int):
+        turn: int, 
+        client_side_tool_calls: dict, 
+        server_side_tool_calls: dict):
 
-        self.debug(f"📊 Research Turn {research_turns}:")
-        self.debug(f"   Client: {total_client_side_tool_calls} | Server: {total_server_side_tool_calls}")
+        client_total = sum(client_side_tool_calls[f"Turn {turn}"].values())
+        server_total = sum(server_side_tool_calls[f"Turn {turn}"].values())
+        
+        self.debug(f"📊 Research Turn {turn}:")
+        self.debug(f"   Client Side Tool Calls: {client_total}")
+        for tool, count in client_side_tool_calls[f"Turn {turn}"].items():
+            self.debug(f"     • {tool}: {count}")
+        self.debug(f"   Server Side Tool Calls: {server_total}")
+        for tool, count in server_side_tool_calls[f"Turn {turn}"].items():
+            self.debug(f"     • {tool}: {count}")
 
     def grok_client_usage(self, usage: 'AgentUsage'):
         self.success(f"Recorded agent usage for {usage.agent_name}")
@@ -193,7 +201,17 @@ Shark Agent Processing
         self.debug(f"   Completion Tokens: {usage.completion_tokens}")
         self.debug(f"   Reasoning Tokens: {usage.reasoning_tokens}")
         self.debug(f"   Prompt Tokens: {usage.prompt_tokens}")
-        self.debug(f"   Server Side Tool Usage: {usage.server_side_tool_usage}")
+
+        total_server_side_tool_calls = sum(
+            sum(turn_data.values()) 
+            for turn_data in usage.server_side_tool_calls.values()
+        )
+        total_client_side_tool_calls = sum(
+            sum(turn_data.values()) 
+            for turn_data in usage.client_side_tool_calls.values()
+        )
+        self.debug(f"   Server Side Tool Calls: {total_server_side_tool_calls}")
+        self.debug(f"   Client Side Tool Calls: {total_client_side_tool_calls}")
 
     def grok_response(self, agent: str, response):
         """

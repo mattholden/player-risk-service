@@ -63,7 +63,7 @@ class SharkAgent:
         return SharkAgentResponse(
             alerts=self._parse_response(response.get('content', ''), team_analyses[0]['context']),
             usage=response.get('usage', {}),
-            server_side_tool_usage=response.get('server_side_tool_usage', {}),
+            grok_client_tool_calls=response.get('grok_client_tool_calls', {}),
         )
 
     

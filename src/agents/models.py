@@ -98,9 +98,9 @@ class InjuryResearchFindings(BaseModel):
         default_factory=dict,
         description="Usage data from the grok client"
     )
-    server_side_tool_usage: dict = Field(
+    grok_client_tool_calls: dict = Field(
         default_factory=dict,
-        description="Server side tool usage from the grok client"
+        description="Tool calls from the grok client"
     )
     search_timestamp: datetime = Field(
         default_factory=datetime.now,
@@ -123,7 +123,8 @@ class InjuryResearchFindings(BaseModel):
                         "title": "Arsenal Official",
                     }
                 ],
-                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20},
+                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200},
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 20}},
                 "search_timestamp": "2025-11-27T16:00:00"
             }
         }
@@ -140,9 +141,9 @@ class TeamAnalysis(BaseModel):
         default_factory=dict,
         description="Usage data from the grok client"
     )
-    server_side_tool_usage: dict = Field(
+    grok_client_tool_calls: dict = Field(
         default_factory=dict,
-        description="Server side tool usage from the grok client"
+        description="Tool calls from the grok client"
     )
     class Config:
         json_schema_extra = {
@@ -152,7 +153,7 @@ class TeamAnalysis(BaseModel):
                 "fixture": "Arsenal vs Brentford",
                 "team_analysis": "Arsenal is a strong team and will win the match",
                 "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20},
-                "server_side_tool_usage": {"tool_name": "tool_name", "usage": 10}
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 10}}
             }
         }
 class PlayerAlert(BaseModel):
@@ -183,12 +184,13 @@ class SharkAgentResponse(BaseModel):
     """
     alerts: Optional[List[PlayerAlert]] = Field(default=[], description="List of player alerts")
     usage: Optional[dict] = Field(default={}, description="Usage data from the shark agent")
-    server_side_tool_usage: Optional[dict] = Field(default={}, description="Server side tool usage from the shark agent")
+    grok_client_tool_calls: Optional[dict] = Field(default={}, description="Tool calls from the grok client")
     class Config:
         json_schema_extra = {
             "example": {
                 "alerts": [PlayerAlert(player_name="Jack Currie", fixture="Oxford United vs Ipswich Town", fixture_date="2025-11-28T19:45:00", alert_level=AlertLevel.HIGH_ALERT, description="Jack Currie is ruled out for the next 2 weeks")],
-                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20}
+                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20},
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 10}}
             }
         }
 
@@ -238,9 +240,13 @@ class AgentUsage(BaseModel):
     completion_tokens: int = Field(..., description="Completion tokens used")
     reasoning_tokens: int = Field(..., description="Reasoning tokens used")
     prompt_tokens: int = Field(..., description="Prompt tokens used")
-    server_side_tool_usage: dict = Field(
+    server_side_tool_calls: dict = Field(
         default_factory=dict,
-        description="Server side tool usage from the grok client"
+        description="Server side tool calls from the grok client"
+    )
+    client_side_tool_calls: dict = Field(
+        default_factory=dict,
+        description="Client side tool calls from the grok client"
     )
     completion_timestamp: datetime = Field(..., description="Timestamp of the usage")
 

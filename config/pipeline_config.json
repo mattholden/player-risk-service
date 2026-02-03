@@ -1,6 +1,6 @@
 {
     "leagues": ["Premier League", "Bundesliga", "Primera División"],
-    "fixtures": ["Celta de Vigo vs Osasuna"],
+    "fixtures": [],
     "dry_run": false,
     "fixtures_only": false,
     "push_all": true,

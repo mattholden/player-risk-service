@@ -1,4 +1,4 @@
-.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry check-roster roster-update-team roster-update-league
+.PHONY: help setup test test-article test-player test-grok test-research init-db db-reset docker-up docker-down streamlit clean db-shell db-tables db-articles db-players pipeline pipeline-dry-run pipeline-fixtures test-roster-sync test-transfermarkt test-roster-update test-custom-tool test-bigquery test-pipeline test-pipeline-step1 test-pipeline-step2 test-pipeline-step4 test-pipeline-step6 test-pipeline-step6-dry test-alert-save prepare-rosters prepare-rosters-teams prepare-rosters-no-verify prepare-rosters-epl prepare-rosters-league test-fixture-list test-fixture-list-epl test-fixture test-fixture-dry test-fixture-index test-fixture-index-dry test-fixture-epl test-fixture-epl-dry check-roster roster-update-team roster-update-league plot-tokens plot-tokens-save
 
 help:
 	@echo "Player Risk Service - Available Commands"
@@ -61,6 +61,11 @@ help:
 	@echo "  make test-fixture-epl-all                 - Run ALL EPL fixtures (push after each)"
 
 	@echo ""
+	@echo "Analysis & Visualization:"
+	@echo "  make plot-tokens                 - Plot token usage from token_tracking.json"
+	@echo "  make plot-tokens FILE=data.json  - Plot from custom JSON file"
+	@echo "  make plot-tokens-save            - Save plot as PNG"
+	@echo ""
 	@echo "Development:"
 	@echo "  make streamlit      - Start Streamlit dashboard"
 	@echo "  make clean          - Remove Python cache files"
@@ -102,6 +107,9 @@ pipeline:
 
 pipeline-enrich-only:
 	python -m src.pipeline --enrich-only $(RUN_ID)
+
+pipeline-debug:
+	python -m pdb src/pipeline.py
 
 prepare-rosters:
 	python -m src.services.roster_preparation
@@ -213,4 +221,16 @@ team-lookup:
 # Usage: make team-add TEAM="Manchester City" LEAGUE="Premier League"
 team-add:
 	python -m src.services.team_lookup "$(TEAM)" "$(LEAGUE)" --save
+
+# Token usage visualization
+# Usage: make plot-tokens (uses token_tracking.json)
+# Usage: make plot-tokens FILE=my_data.json
+plot-tokens:
+	python -m scripts.plot_token_usage $(if $(FILE),$(FILE),token_tracking.json)
+
+# Save token usage plot as PNG
+# Usage: make plot-tokens-save (saves to token_usage.png)
+# Usage: make plot-tokens-save FILE=data.json OUTPUT=my_plot.png
+plot-tokens-save:
+	python -m scripts.plot_token_usage $(if $(FILE),$(FILE),token_tracking.json) -o $(if $(OUTPUT),$(OUTPUT),token_usage.png)
 

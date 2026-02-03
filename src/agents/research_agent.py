@@ -98,17 +98,28 @@ class ResearchAgent:
                 fixture=context.fixture,
                 findings=json.loads(response.get('content', '{}')),
                 sources=response.get('sources', []),
+                usage=response.get('usage', {}),
+                grok_client_tool_calls=response.get('grok_client_tool_calls', {}),
                 search_timestamp=datetime.now()
             )
             
         except Exception as e:
             self.logger.error(f"Research Agent Failed: {e}")
-            # Return empty findings on error
+            # Return empty findings dict on error (must have 'description' key for downstream)
             return InjuryResearchFindings(
                 team_name=context.team,
                 fixture=context.fixture,
-                findings=[],
+                findings={
+                    'description': '',
+                    'confirmed_out': [],
+                    'questionable': [],
+                    'returned_to_training': [],
+                    'manager_comments': [],
+                    'speculation': []
+                },
                 sources=[],
+                usage={},
+                grok_client_tool_calls={},
                 search_timestamp=datetime.now()
             )
     

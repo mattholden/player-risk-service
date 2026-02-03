@@ -90,6 +90,8 @@ class GrokClient:
         self._request_timestamps: List[datetime] = []
         
         self.logger.success(f"Grok Client Initialized (model: {model}, using xAI SDK)")
+
+        self.server_side_tool_calls: dict[str, int] = {}
     
     def _check_rate_limit(self) -> None:
         """
@@ -396,6 +398,7 @@ class GrokClient:
             tools=tools if tools else None,
             reasoning_effort="high",
             max_turns=5,
+            parallel_tool_calls=True
         )
 
         for message in messages:
@@ -407,11 +410,13 @@ class GrokClient:
                 chat.append(user(content))
 
         research_turns = 0
+        server_side_tool_call_tracking = {}
+        client_side_tool_call_tracking = {}
         
         while True:
-            total_server_side_tool_calls = 0
-            total_client_side_tool_calls = 0
             research_turns += 1
+            server_side_tool_call_tracking[f"Turn {research_turns}"] = {}
+            client_side_tool_call_tracking[f"Turn {research_turns}"] = {}
             client_side_tool_calls = []
             
             for response, chunk in chat.stream():
@@ -419,11 +424,12 @@ class GrokClient:
                     tool_type = get_tool_call_type(tool_call)
                     if tool_type == "client_side_tool":
                         client_side_tool_calls.append(tool_call)
-                        total_client_side_tool_calls += 1
+                        client_side_tool_call_tracking[f"Turn {research_turns}"][tool_call.function.name] = client_side_tool_call_tracking[f"Turn {research_turns}"].get(tool_call.function.name, 0) + 1
+                       
                     else:
-                        total_server_side_tool_calls += 1
+                        server_side_tool_call_tracking[f"Turn {research_turns}"][tool_call.function.name] = server_side_tool_call_tracking[f"Turn {research_turns}"].get(tool_call.function.name, 0) + 1
                     
-            self.logger.grok_client_tool_calls(research_turns, total_client_side_tool_calls, total_server_side_tool_calls)
+            self.logger.grok_client_tool_calls(research_turns, client_side_tool_call_tracking, server_side_tool_call_tracking)
             
             chat.append(response)
             
@@ -443,14 +449,31 @@ class GrokClient:
                     self.logger.warning(f"Unknown tool: {tool_call.function.name}")
                     continue
             
+        # Convert SDK usage objects to dicts
+        raw_usage = getattr(response, 'usage', None)
+        usage_dict = {}
+        if raw_usage:
+            usage_dict = {
+                'total_tokens': getattr(raw_usage, 'total_tokens', 0),
+                'completion_tokens': getattr(raw_usage, 'completion_tokens', 0),
+                'reasoning_tokens': getattr(raw_usage, 'reasoning_tokens', 0),
+                'prompt_tokens': getattr(raw_usage, 'prompt_tokens', 0),
+            }
+        
+        # Tools Calls
+        grok_client_tool_calls = {
+                "server_side_tool_calls": server_side_tool_call_tracking,
+                "client_side_tool_calls": client_side_tool_call_tracking,
+        }
+
 
         return {
             "content": response.content,
             "role": "assistant",
             "model": self.model,
-            "sources": response.citations,
-            "usage": response.usage,
-            "server_side_tool_usage": response.server_side_tool_usage,
+            "sources": getattr(response, 'citations', []),
+            "usage": usage_dict,
+            "grok_client_tool_calls": grok_client_tool_calls,
             "created_at": datetime.now()
         }
 

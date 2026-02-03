@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 import json
 
 from src.clients.grok_client import GrokClient
-from src.agents.models import TeamContext, PlayerAlert
+from src.agents.models import TeamContext, PlayerAlert, SharkAgentResponse
 from database.enums import AlertLevel
 from src.logging import get_logger
 from prompts.base import AgentPrompt
@@ -59,37 +59,43 @@ class SharkAgent:
             verbose=True
         )
         self.logger.grok_response("Shark Agent", response)
-        return self._parse_response(response.get('content', ''), team_analyses[0]['context'])
-    
-    def analyze_player_risk(
-        self, 
-        context: TeamContext,
-        injury_news: List[str],
-        expert_analysis: str) -> List[PlayerAlert]:
-        """
-        Analyze the risk of a player playing in a fixture (single team).
-        
-        DEPRECATED: Use analyze_player_risk_for_fixture() instead to prevent duplicates.
-        This method is kept for backward compatibility.
-        
-        Returns:
-            List of PlayerAlert objects with alert levels and descriptions
-        """
 
-        user_message = self._build_user_message(context, injury_news, expert_analysis)
-        self.logger.agent_user_message("Shark Agent", user_message)
-        system_message = self._build_system_message()
-        self.logger.agent_system_message("Shark Agent", system_message)
-        messages = [system_message, user_message]
-        response = self.grok_client.chat_with_streaming(
-            messages=messages,
-            tool_registry=None, ## Switch to roster tool registry when it's fixed
-            use_web_search=True,
-            use_x_search=True,
-            verbose=True
+        return SharkAgentResponse(
+            alerts=self._parse_response(response.get('content', ''), team_analyses[0]['context']),
+            usage=response.get('usage', {}),
+            grok_client_tool_calls=response.get('grok_client_tool_calls', {}),
         )
-        self.logger.grok_response("Shark Agent", response)
-        return self._parse_response(response.get('content', ''), context)
+
+    
+    # def analyze_player_risk(
+    #     self, 
+    #     context: TeamContext,
+    #     injury_news: List[str],
+    #     expert_analysis: str) -> List[PlayerAlert]:
+    #     """
+    #     Analyze the risk of a player playing in a fixture (single team).
+        
+    #     DEPRECATED: Use analyze_player_risk_for_fixture() instead to prevent duplicates.
+    #     This method is kept for backward compatibility.
+        
+    #     Returns:
+    #         List of PlayerAlert objects with alert levels and descriptions
+    #     """
+
+    #     user_message = self._build_user_message(context, injury_news, expert_analysis)
+    #     self.logger.agent_user_message("Shark Agent", user_message)
+    #     system_message = self._build_system_message()
+    #     self.logger.agent_system_message("Shark Agent", system_message)
+    #     messages = [system_message, user_message]
+    #     response = self.grok_client.chat_with_streaming(
+    #         messages=messages,
+    #         tool_registry=None, ## Switch to roster tool registry when it's fixed
+    #         use_web_search=True,
+    #         use_x_search=True,
+    #         verbose=True
+    #     )
+    #     self.logger.grok_response("Shark Agent", response)
+    #     return self._parse_response(response.get('content', ''), context)
 
     def _build_fixture_user_message(self, team_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """

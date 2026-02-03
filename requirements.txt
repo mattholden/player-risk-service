@@ -27,3 +27,6 @@ google-cloud-bigquery>=3.26.0  # BigQuery client (3.26+ uses protobuf 5.x)
 pandas>=2.0.0  # DataFrame support for BigQuery
 pyarrow>=14.0.0  # Required for BigQuery to DataFrame conversion
 db-dtypes>=1.2.0  # BigQuery-specific data types for pandas
+
+# Visualization
+matplotlib>=3.8.0  # Plotting for token usage analysis

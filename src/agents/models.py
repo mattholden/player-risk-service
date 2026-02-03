@@ -8,8 +8,19 @@ between different parts of the agent pipeline.
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from enum import Enum as PyEnum
 from database.enums import AlertLevel
+
+
+class AgentResponseError(Exception):
+    """
+    Raised when an agent returns an invalid response after exhausting retries.
+    
+    This exception bubbles up to the fixture-level retry logic in pipeline.py.
+    """
+    def __init__(self, agent_name: str, reason: str):
+        self.agent_name = agent_name
+        self.reason = reason
+        super().__init__(f"{agent_name} failed: {reason}")
 
 
 class PlayerContext(BaseModel):
@@ -78,11 +89,19 @@ class InjuryResearchFindings(BaseModel):
     findings: dict = Field(
         default_factory=dict,
         description = "Findings from the research as a dictionary"
-        )
+    )
     sources: List[str] = Field(
         default_factory=list, 
         description = "List of sources"
-        )
+    )
+    usage: dict = Field(
+        default_factory=dict,
+        description="Usage data from the grok client"
+    )
+    grok_client_tool_calls: dict = Field(
+        default_factory=dict,
+        description="Tool calls from the grok client"
+    )
     search_timestamp: datetime = Field(
         default_factory=datetime.now,
         description="When this research was conducted"
@@ -104,67 +123,11 @@ class InjuryResearchFindings(BaseModel):
                         "title": "Arsenal Official",
                     }
                 ],
+                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200},
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 20}},
                 "search_timestamp": "2025-11-27T16:00:00"
             }
         }
-class ResearchFindings(BaseModel):
-    """
-    Output from the Research Agent.
-    
-    Contains all sources found, key findings extracted, and a summary.
-    This will be passed to the Assessment Agent for risk evaluation.
-    """
-    player_name: str = Field(..., description="Player being researched")
-    sources: List[str] = Field(
-        default_factory=list, 
-        description="List of source citations found"
-    )
-    key_findings: List[str] = Field(
-        default_factory=list,
-        description="Bullet points of important information extracted"
-    )
-    summary: str = Field(
-        ..., 
-        description="2-3 sentence overview of the injury status"
-    )
-    search_timestamp: datetime = Field(
-        default_factory=datetime.now,
-        description="When this research was conducted"
-    )
-    confidence_score: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in findings (0.0 = no info, 1.0 = very confident)"
-    )
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "player_name": "Jack Currie",
-                "sources": [
-                    {
-                        "url": "https://twitter.com/OxfordUnited/status/123456",
-                        "title": "Oxford United Official",
-                        "snippet": "Jack Currie participated in full training",
-                        "published_date": "2025-11-27T14:30:00",
-                        "source_type": "twitter"
-                    }
-                ],
-                "key_findings": [
-                    "Participated in full training on Nov 27",
-                    "No injury concerns mentioned in press conference",
-                    "Expected to be available for Friday's match"
-                ],
-                "summary": "Jack Currie appears fully fit with no injury concerns. Participated in full training and is expected to be available for the Ipswich Town fixture.",
-                "search_timestamp": "2025-11-27T16:00:00",
-                "confidence_score": 0.85
-            }
-        }
-    
-    def to_dict(self) -> dict:
-        """Convert to dictionary for database storage."""
-        return self.model_dump(mode='json')
 
 class TeamAnalysis(BaseModel):
     """
@@ -174,7 +137,25 @@ class TeamAnalysis(BaseModel):
     opponent_name: str = Field(..., description="Opponent team being analyzed")
     fixture: str = Field(..., description="Fixture being analyzed")
     team_analysis: str = Field(..., description="Analysis of the team's performance")
-    
+    usage: dict = Field(
+        default_factory=dict,
+        description="Usage data from the grok client"
+    )
+    grok_client_tool_calls: dict = Field(
+        default_factory=dict,
+        description="Tool calls from the grok client"
+    )
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "team_name": "Arsenal",
+                "opponent_name": "Brentford",
+                "fixture": "Arsenal vs Brentford",
+                "team_analysis": "Arsenal is a strong team and will win the match",
+                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20},
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 10}}
+            }
+        }
 class PlayerAlert(BaseModel):
     """
     Output from the shark agent
@@ -194,6 +175,22 @@ class PlayerAlert(BaseModel):
                 "fixture_date": "2025-11-28T19:45:00",
                 "alert_level": AlertLevel.HIGH_ALERT,
                 "description": "Jack Currie is ruled out for the next 2 weeks"
+            }
+        }
+
+class SharkAgentResponse(BaseModel):
+    """
+    Output from the shark agent
+    """
+    alerts: Optional[List[PlayerAlert]] = Field(default=[], description="List of player alerts")
+    usage: Optional[dict] = Field(default={}, description="Usage data from the shark agent")
+    grok_client_tool_calls: Optional[dict] = Field(default={}, description="Tool calls from the grok client")
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "alerts": [PlayerAlert(player_name="Jack Currie", fixture="Oxford United vs Ipswich Town", fixture_date="2025-11-28T19:45:00", alert_level=AlertLevel.HIGH_ALERT, description="Jack Currie is ruled out for the next 2 weeks")],
+                "usage": {"total_tokens": 1000, "completion_tokens": 500, "reasoning_tokens": 300, "prompt_tokens": 200, "server_tool_calls": 10, "client_tool_calls": 20},
+                "grok_client_tool_calls": {"server_side_tool_calls": {"tool_name": 10}, "client_side_tool_calls": {"tool_name": 10}}
             }
         }
 
@@ -233,3 +230,84 @@ class AnalystPromptPlaceholders(BaseModel):
     opponent: str = Field(..., description="Opponent team being analyzed")
     current_date: datetime = Field(..., description="Current date")
     injury_news: str = Field(..., description="Injury news")
+
+class AgentUsage(BaseModel):
+    """
+    Usage data (tokens, server calls, etc.) for an agent.
+    """
+    agent_name: str = Field(..., description="Name of the agent")
+    total_tokens: int = Field(..., description="Total tokens used")
+    completion_tokens: int = Field(..., description="Completion tokens used")
+    reasoning_tokens: int = Field(..., description="Reasoning tokens used")
+    prompt_tokens: int = Field(..., description="Prompt tokens used")
+    server_side_tool_calls: dict = Field(
+        default_factory=dict,
+        description="Server side tool calls from the grok client"
+    )
+    client_side_tool_calls: dict = Field(
+        default_factory=dict,
+        description="Client side tool calls from the grok client"
+    )
+    completion_timestamp: datetime = Field(..., description="Timestamp of the usage")
+
+class FixtureUsage(BaseModel):
+    """
+    Usage data across all agents for a fixture.
+    """
+    fixture: Optional[str] = Field(default=None, description="Fixture being analyzed")
+    match_time: Optional[datetime] = Field(default=None, description="Parsed match datetime")
+    agent_usages: Optional[List[AgentUsage]] = Field(default=None, description="Usage data for each agent")
+    start_timestamp: Optional[datetime] = Field(default=None, description="Timestamp of the start of the fixture")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "fixture": "Arsenal vs Brentford",
+                "match_time": "2025-11-28T19:45:00",
+                "agent_usages": [
+                    {
+                        "agent_name": "research_agent_1",
+                        "total_tokens": 1000,
+                        "completion_tokens": 500,
+                        "reasoning_tokens": 300,
+                        "prompt_tokens": 200,
+                        "server_side_tool_usage": {"tool_name": "tool_name", "usage": 10},
+                        "completion_timestamp": "2025-11-28T19:45:00"
+                    }
+                ]
+            }
+        }
+
+class PipelineUsage(BaseModel):
+    """
+    Usage data across all fixtures and agents for a pipeline run.
+    """
+    run_id: str = Field(..., description="ID of the pipeline run")
+    fixture_usages: List[FixtureUsage] = Field(..., description="Usage data for each fixture")
+    completion_timestamp: datetime = Field(..., description="Timestamp of the completion of the pipeline")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "run_id": "1234567890",
+                "fixture_usages": [
+                    {
+                        "fixture": "Arsenal vs Brentford",
+                        "match_time": "2025-11-28T19:45:00",
+                        "agent_usages": [
+                            {
+                                "agent_name": "research_agent_1",
+                                "total_tokens": 1000,
+                                "completion_tokens": 500,
+                                "reasoning_tokens": 300,
+                                "prompt_tokens": 200,
+                                "server_side_tool_usage": {"tool_name": "tool_name", "usage": 10},
+                                "completion_timestamp": "2025-11-28T19:45:00"
+                            }
+                        ],
+                        "completion_timestamp": "2025-11-28T19:45:00"
+                    }
+                ],
+                "completion_timestamp": "2025-11-28T19:45:00"
+            }
+        }

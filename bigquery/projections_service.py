@@ -105,7 +105,7 @@ class ProjectionsService:
                 {match_time_column} as match_time,
                 {league_column} as league
             FROM `{self.source_table_id}`
-            WHERE {match_time_column} > '{self.specific_date}'
+            WHERE {match_time_column} > '{self.today}'
             ORDER BY {match_time_column}
         """
         
@@ -114,46 +114,16 @@ class ProjectionsService:
         
         return fixtures
     
-    def get_projections(
-        self,
-        fixture: Optional[str] = None,
-        fixture_date: Optional[datetime] = None,
-        player_name_column: str = "player_name",
-        fixture_column: str = "fixture"
-    ) -> pd.DataFrame:
+    def get_all_projections(self) -> pd.DataFrame:
         """
-        Pull projections from BigQuery.
-        
-        Args:
-            fixture: Optional fixture filter (e.g., "Arsenal vs Brentford")
-            fixture_date: Optional date filter
-            player_name_column: Column name for player names in source table
-            fixture_column: Column name for fixture in source table
-            
-        Returns:
-            pd.DataFrame: Projections data
+        Pull all projections from the source table.
         """
-        # Build query with optional filters
-        query = f"SELECT * FROM `{self.source_table_id}`"
-        
-        conditions = []
-        if fixture:
-            # Handle fixture matching (could be exact or partial)
-            conditions.append(f"{fixture_column} = '{fixture}'")
-        if fixture_date:
-            date_str = fixture_date.strftime("%Y-%m-%d")
-            conditions.append(f"DATE(fixture_date) = '{date_str}'")
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        print("📊 Fetching projections from BigQuery...")
-        print(f"   Query: {query}")
-        
-        df = self.client.query(query)
-        print(f"   Found {len(df)} projection rows")
-        
-        return df
+        query = f"""
+            SELECT *
+            FROM `{self.source_table_id}`
+            WHERE match_time > '{self.today}'
+        """
+        return self.client.query(query)
     
     def get_all_projections_for_fixtures(
         self,
@@ -182,7 +152,7 @@ class ProjectionsService:
             SELECT * 
             FROM `{self.source_table_id}`
             WHERE {fixture_column} IN ({fixtures_str})
-            AND match_time > '{self.specific_date}'
+            AND match_time > '{self.today}'
         """
         self.logger.info(f"📊 Fetching projections for {len(fixtures)} fixtures...")
         df = self.client.query(query)

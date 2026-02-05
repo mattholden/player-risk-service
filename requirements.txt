@@ -30,3 +30,6 @@ db-dtypes>=1.2.0  # BigQuery-specific data types for pandas
 
 # Visualization
 matplotlib>=3.8.0  # Plotting for token usage analysis
+
+# Profiling
+py-spy  # Sampling profiler - generates flamegraphs

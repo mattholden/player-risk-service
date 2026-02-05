@@ -234,3 +234,7 @@ plot-tokens:
 plot-tokens-save:
 	python -m scripts.plot_token_usage $(if $(FILE),$(FILE),token_tracking.json) -o $(if $(OUTPUT),$(OUTPUT),token_usage.png)
 
+# Profiling with py-spy (generates flamegraph SVG)
+# May need sudo on macOS: sudo make pipeline-profile
+pipeline-profile:
+	py-spy record -o profile.svg -- python -m src.pipeline

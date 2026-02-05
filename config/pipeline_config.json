@@ -2,7 +2,7 @@
     "leagues": ["Premier League", "Bundesliga", "Primera División"],
     "fixtures": [],
     "dry_run": false,
-    "fixtures_only": false,
+    "fixtures_only": true,
     "push_all": true,
     "verbose": true,
     "sport": "soccer"

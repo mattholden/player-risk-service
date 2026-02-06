@@ -25,7 +25,7 @@ class AnalystAgent:
         self.logger = get_logger()
         self.logger.success("Analyst Agent Initialized")
 
-    def analyze_injury_news(
+    async def analyze_injury_news(
         self,
         context: TeamContext, 
         injury_news: str
@@ -54,7 +54,7 @@ class AnalystAgent:
         messages = [system_message, user_message]
 
         try:
-            response = self.grok_client.chat_with_streaming(
+            response = await self.grok_client.chat_with_agent(
                 messages=messages,
                 tool_registry=None, ## Switch to roster tool registry when it's fixed
                 use_web_search=True,

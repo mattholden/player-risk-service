@@ -13,6 +13,7 @@ from database import AlertService
 from src.logging import get_logger
 from prompts import get_sport_config  # noqa: E402
 from typing import Optional
+import asyncio
 class AgentPipeline:
     """
     Pipeline that orchestrates the agents.
@@ -66,7 +67,7 @@ class AgentPipeline:
                 )
             ]
 
-    def _run_agent_with_retry(
+    async def _run_agent_with_retry(
         self,
         agent_name: str,
         agent_fn: Callable[[], Any],
@@ -92,7 +93,7 @@ class AgentPipeline:
         
         for attempt in range(1, max_retries + 1):
             try:
-                result = agent_fn()
+                result = await agent_fn()
                 
                 if validator_fn(result):
                     if attempt > 1:
@@ -104,11 +105,12 @@ class AgentPipeline:
                     f"{agent_name} returned invalid response on attempt {attempt}/{max_retries}"
                 )
                 last_error = "Invalid response structure"
-                
+            
+            except asyncio.CancelledError:
+                raise
+
             except Exception as e:
-                # Don't retry on deliberate interrupts (debugger exit)
-                # Note: KeyboardInterrupt and SystemExit don't inherit from Exception,
-                # but BdbQuit (debugger quit) does, so we check explicitly
+                # Workaround for debugger exit
                 if isinstance(e, BdbQuit):
                     raise
                 self.logger.warning(
@@ -191,7 +193,7 @@ class AgentPipeline:
         self.fixture_usages.append(self._current_fixture_usage)
         self._current_fixture_usage = None
 
-    def run(self, agent_data: AgentData) -> List[PlayerAlert]:
+    async def run(self, agent_data: AgentData) -> List[PlayerAlert]:
         """
         Run the pipeline with agent-level retry logic.
         
@@ -210,10 +212,11 @@ class AgentPipeline:
         team_analyses = []
         self._setup_usage_data(agent_data.fixture, agent_data.match_time)
 
-        for context in agent_data.team_contexts:
+        async def process_team(context:TeamContext) -> dict:
+            """Nested function for processing both teams asynchronously."""
             # Research Agent with retry and validation
             self.logger.reseach_agent_processing(context)
-            research_result = self._run_agent_with_retry(
+            research_result = await self._run_agent_with_retry(
                 agent_name=f"Research Agent ({context.team})",
                 agent_fn=lambda ctx=context: self.research_agent.research_team(ctx),
                 validator_fn=self._validate_research_response
@@ -222,7 +225,7 @@ class AgentPipeline:
             self._record_agent_usage(f"Research Agent ({context.team})", research_result.usage, research_result.grok_client_tool_calls)
             # Analyst Agent with retry and validation
             self.logger.analyst_agent_processing(context)
-            analyst_result = self._run_agent_with_retry(
+            analyst_result = await self._run_agent_with_retry(
                 agent_name=f"Analyst Agent ({context.team})",
                 agent_fn=lambda ctx=context, research=research_response: 
                     self.analyst_agent.analyze_injury_news(ctx, research),
@@ -230,20 +233,31 @@ class AgentPipeline:
             )
             analyst_response = analyst_result.team_analysis
             self._record_agent_usage(f"Analyst Agent ({context.team})", analyst_result.usage, analyst_result.grok_client_tool_calls)
-            team_analyses.append({
+            
+            return {
                 'context': context,
                 'research': research_response,
                 'analyst': analyst_response
-            })
+            }
+
+        team_analyses = await asyncio.gather (
+            *[process_team(context) for context in agent_data.team_contexts],
+            return_exceptions=True
+        )
+
+        team_analyses  = [t for t in team_analyses if not isinstance(t, Exception)]
+            
+        if not team_analyses:
+            raise AgentResponseError("No team analyses returned")
         
         self.logger.shark_agent_processing(agent_data.team_contexts[0])
-        shark_response = self.shark_agent.analyze_player_risk_for_fixture(team_analyses)
-        self._record_agent_usage(f"Shark Agent ({context.fixture})", shark_response.usage, shark_response.grok_client_tool_calls)
+        shark_response = await self.shark_agent.analyze_player_risk_for_fixture(team_analyses)
+        self._record_agent_usage(f"Shark Agent ({agent_data.team_contexts[0].fixture})", shark_response.usage, shark_response.grok_client_tool_calls)
         self._record_fixture_usage()
 
         return shark_response.alerts
 
-    def run_and_save(self, agent_data: AgentData) -> List[PlayerAlert]:
+    async def run_and_save(self, agent_data: AgentData) -> List[PlayerAlert]:
         """
         Run the pipeline and save alerts to the database.
         
@@ -253,7 +267,7 @@ class AgentPipeline:
         Returns:
             List[PlayerAlert]: Generated alerts (also saved to DB)
         """
-        alerts = self.run(agent_data)
+        alerts = await self.run(agent_data)
         if alerts:
             self.alert_service.save_alerts(alerts)
         return alerts

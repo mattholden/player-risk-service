@@ -11,6 +11,8 @@ This agent:
 This is Agent #1 in the two-agent pipeline.
 """
 
+import asyncio
+
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import json
@@ -50,7 +52,7 @@ class ResearchAgent:
         self.logger = get_logger()
         self.logger.success("Research Agent Initialized")
     
-    def research_team(
+    async def research_team(
         self, 
         context: TeamContext,
         lookback_days: int = 14
@@ -83,7 +85,7 @@ class ResearchAgent:
             messages = [system_message, user_message]
             
             # Use chat_completion for native tools only (no custom tools)
-            response = self.grok_client.chat_with_streaming(
+            response = await self.grok_client.chat_with_agent(
                 messages=messages,
                 tool_registry=tool_registry,
                 use_web_search=True,

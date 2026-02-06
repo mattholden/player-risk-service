@@ -55,6 +55,9 @@ class ProjectionAlertPipeline:
         self.roster_update_service = RosterUpdateService()
         self.agent_pipeline = AgentPipeline(self.run_id, self.sport)
         self.logger.success("Projection Alert Pipeline Initialized")
+
+        self.max_concurrent_requests = 5
+        self.max_failures = 3
     
     # =========================================================================
     # Step 1: Fetch Fixtures
@@ -95,7 +98,7 @@ class ProjectionAlertPipeline:
     # Step 4-5: Run Agent Pipeline
     # =========================================================================
     
-    def run_agents_for_fixture(self, agent_data: AgentData) -> Optional[list]:
+    async def run_agents_for_fixture(self, agent_data: AgentData) -> Optional[list]:
         """
         Run the agentic pipeline for a fixture and save alerts.
         
@@ -112,10 +115,12 @@ class ProjectionAlertPipeline:
         self.logger.fixture_info("Running agent pipeline", agent_data.fixture)
         
         try:
-            alerts = self.agent_pipeline.run_and_save(agent_data)
+            alerts = await self.agent_pipeline.run_and_save(agent_data)
             return alerts
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            # Don't catch debugger quit - let it terminate the program
+            # Workaround for debugger exit
             if isinstance(e, BdbQuit):
                 raise
             
@@ -239,39 +244,9 @@ class ProjectionAlertPipeline:
             return
         
         self.logger.section("PROCESSING FIXTURES")
+        all_alerts = await self.run_with_circuit_breaker(fixtures)
         
-        all_alerts = []
-        consecutive_failures = 0
-        max_consecutive_failures = 3
-        
-        for i, fixture_data in enumerate(fixtures, 1):
-            agent_data = AgentData(
-                fixture=fixture_data['fixture'],
-                match_time=parse_date_string(fixture_data['match_time'])
-            )
-            
-            # Removing roster update from pipeline TODO: Separate Logging for Roster Updates
-            # # Step 2-3: Update rosters
-            # await self.roster_update_service.update_fixture_rosters(fixture)
-            
-            # Step 4-5: Run agents
-            alerts = self.run_agents_for_fixture(agent_data)
-            
-            if alerts is None:
-                # Fixture failed
-                consecutive_failures += 1
-                if consecutive_failures >= max_consecutive_failures:
-                    self.logger.error(
-                        f"Circuit breaker triggered: {max_consecutive_failures} consecutive fixture failures. "
-                        f"Stopping pipeline to prevent further resource waste."
-                    )
-                    break
-            else:
-                # Fixture succeeded - reset counter and collect alerts
-                consecutive_failures = 0
-                all_alerts.extend(alerts)
-        
-        # Step 6-7: Enrich and push
+        # Enrich and push
         self.logger.section("📊 PROJECTIONS MERGE WITH ALERTS & EXPORT TO BIGQUERY")
         
         if not self.dry_run:
@@ -282,6 +257,50 @@ class ProjectionAlertPipeline:
             self.logger.dry_run()
         
         self.logger.pipeline_complete(fixtures, all_alerts)
+
+    async def run_with_circuit_breaker(
+        self,
+        fixtures: list[dict]
+    ) -> list:
+
+        semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        async def process_fixture(fixture_data: dict) -> list:
+            """Nested function for processing fixtures asynchronously."""
+            async with semaphore:
+                agent_data = AgentData(
+                    fixture=fixture_data['fixture'],
+                    match_time=parse_date_string(fixture_data['match_time'])
+                )
+                return await self.run_agents_for_fixture(agent_data)
+
+
+        pending = {asyncio.create_task(process_fixture(f)) for f in fixtures}
+
+        failed_count = 0
+        all_alerts = []
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+
+            for task in done:
+                exception = task.exception()
+                result = task.result() if not exception else None
+
+                if exception or result is None:
+                    failed_count += 1
+                    if exception:
+                        self.logger.error(f"Fixture failed: {exception}")
+                    else:
+                        self.logger.error("Fixture failed: (returned None)")
+                    if failed_count >= self.max_failures:
+                        self.logger.error(f"Circuit breaker triggered: {self.max_failures} consecutive fixture failures. Stopping pipeline to prevent further resource waste.")
+                        for p in pending:
+                            p.cancel()
+                        return all_alerts
+                else:
+                    all_alerts.extend(result)
+
+        return all_alerts
+
     
     def run(self, fixtures: Optional[list[dict]] = None) -> None:
         """

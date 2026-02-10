@@ -1,6 +1,6 @@
 {
     "leagues": ["Premier League", "Bundesliga", "Primera División"],
-    "fixtures": ["Atlético de Madrid vs Real Betis"],
+    "fixtures": [],
     "dry_run": false,
     "fixtures_only": false,
     "push_all": true,

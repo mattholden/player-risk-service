@@ -127,31 +127,31 @@ class GrokClient:
         
         return self._async_client
 
-    def _check_rate_limit(self) -> None:
-        """
-        Check if we're within rate limits.
+    # def _check_rate_limit(self) -> None:
+    #     """
+    #     Check if we're within rate limits.
         
-        Raises:
-            RateLimitExceeded: If rate limit would be exceeded
-        """
-        now = datetime.now()
-        cutoff = now - timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
+    #     Raises:
+    #         RateLimitExceeded: If rate limit would be exceeded
+    #     """
+    #     now = datetime.now()
+    #     cutoff = now - timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
         
-        # Remove timestamps outside the window
-        self._request_timestamps = [
-            ts for ts in self._request_timestamps if ts > cutoff
-        ]
+    #     # Remove timestamps outside the window
+    #     self._request_timestamps = [
+    #         ts for ts in self._request_timestamps if ts > cutoff
+    #     ]
         
-        if len(self._request_timestamps) >= self.MAX_REQUESTS_PER_HOUR:
-            oldest = self._request_timestamps[0]
-            wait_seconds = (oldest + timedelta(seconds=self.REQUEST_WINDOW_SECONDS) - now).total_seconds()
-            raise RateLimitExceeded(
-                f"Rate limit exceeded. {len(self._request_timestamps)}/{self.MAX_REQUESTS_PER_HOUR} "
-                f"requests in last hour. Wait {wait_seconds:.0f} seconds."
-            )
+    #     if len(self._request_timestamps) >= self.MAX_REQUESTS_PER_HOUR:
+    #         oldest = self._request_timestamps[0]
+    #         wait_seconds = (oldest + timedelta(seconds=self.REQUEST_WINDOW_SECONDS) - now).total_seconds()
+    #         raise RateLimitExceeded(
+    #             f"Rate limit exceeded. {len(self._request_timestamps)}/{self.MAX_REQUESTS_PER_HOUR} "
+    #             f"requests in last hour. Wait {wait_seconds:.0f} seconds."
+    #         )
         
-        # Record this request
-        self._request_timestamps.append(now)
+    #     # Record this request
+    #     self._request_timestamps.append(now)
     
     @retry(
         retry=retry_if_exception_type(Exception),
@@ -184,7 +184,7 @@ class GrokClient:
             **kwargs: Additional parameters
         """
         # Check rate limit
-        self._check_rate_limit()
+        # self._check_rate_limit()
         # Build tools list
         tools = []
         if use_web_search:
@@ -296,7 +296,7 @@ class GrokClient:
         """
         Async function for concurrent chats with grok client
         """
-        self._check_rate_limit()
+        # self._check_rate_limit()
 
         async def _execute():
 
@@ -404,44 +404,54 @@ class GrokClient:
         except asyncio.TimeoutError:
             self.logger.error(f"Grok agent timed out after {self.async_timeout}s")
             # Return a response structure that callers can handle
-            return {
-                "content": "",
-                "role": "assistant",
-                "model": self.model,
-                "sources": [],
-                "usage": {},
-                "grok_client_tool_calls": {},
-                "created_at": datetime.now(),
-                "error": "timeout",  # Flag for callers to check
-                "error_message": f"Request timed out after {self.async_timeout} seconds"
-            }
+            return self._error_response("timeout", f"Request timed out after {self.async_timeout} seconds")
+        except Exception as e:
+            error_str = str(e).lower()
+            if "429" in error_str or "rate limit" in error_str:
+                self.logger.error("Rate limit exceeded (429)")
+                return self._error_response("rate_limit", "Rate limit exceeded")
+            # Re-raise other exceptions
+            raise
 
-    def get_rate_limit_status(self) -> Dict[str, Any]:
-        """
-        Get current rate limit status.
-        
-        Returns:
-            Dictionary with rate limit info
-        """
-        now = datetime.now()
-        cutoff = now - timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
-        
-        # Clean old timestamps
-        self._request_timestamps = [
-            ts for ts in self._request_timestamps if ts > cutoff
-        ]
-        
-        remaining = self.MAX_REQUESTS_PER_HOUR - len(self._request_timestamps)
-        
+    def _error_response(self, error_type: str, message: str) -> Dict[str, Any]:
         return {
-            "requests_made": len(self._request_timestamps),
-            "requests_remaining": remaining,
-            "limit": self.MAX_REQUESTS_PER_HOUR,
-            "window_seconds": self.REQUEST_WINDOW_SECONDS,
-            "reset_time": (
-                self._request_timestamps[0] + timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
-                if self._request_timestamps else now
-            )
+            "content": "",
+            "role": "assistant",
+            "model": self.model,
+            "sources": [],
+            "usage": {},
+            "grok_client_tool_calls": {},
+            "created_at": datetime.now(),
+            "error": error_type,
+            "error_message": message
         }
+
+    # def get_rate_limit_status(self) -> Dict[str, Any]:
+    #     """
+    #     Get current rate limit status.
+        
+    #     Returns:
+    #         Dictionary with rate limit info
+    #     """
+    #     now = datetime.now()
+    #     cutoff = now - timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
+        
+    #     # Clean old timestamps
+    #     self._request_timestamps = [
+    #         ts for ts in self._request_timestamps if ts > cutoff
+    #     ]
+        
+    #     remaining = self.MAX_REQUESTS_PER_HOUR - len(self._request_timestamps)
+        
+    #     return {
+    #         "requests_made": len(self._request_timestamps),
+    #         "requests_remaining": remaining,
+    #         "limit": self.MAX_REQUESTS_PER_HOUR,
+    #         "window_seconds": self.REQUEST_WINDOW_SECONDS,
+    #         "reset_time": (
+    #             self._request_timestamps[0] + timedelta(seconds=self.REQUEST_WINDOW_SECONDS)
+    #             if self._request_timestamps else now
+    #         )
+    #     }
 
 
